@@ -1,0 +1,6 @@
+/config/thegamesdb-key
+/.thegamesdb-key
+/covers/*
+!/covers/.gitkeep
+/__pycache__/
+*.py[cod]

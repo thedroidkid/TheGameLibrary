@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10131b">
+  <title>The Game Library</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10131b;
+      --panel: #181d28;
+      --panel-raised: #202735;
+      --line: #30394a;
+      --muted: #a1aabc;
+      --text: #f3f5fa;
+      --accent: #a9ef57;
+      --accent-ink: #1d2a0d;
+      --danger: #ff777d;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; background: var(--bg); color: var(--text); }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .shell { width: min(1440px, calc(100% - 48px)); margin: 0 auto; }
+    .topbar { height: 78px; border-bottom: 1px solid #252b38; }
+    .topbar-inner { display: flex; height: 100%; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 750; letter-spacing: -.03em; }
+    .brand-mark { display: grid; width: 35px; height: 35px; place-items: center; border-radius: 11px; background: var(--accent); color: var(--accent-ink); font-size: 20px; }
+    .top-label { color: var(--muted); font-size: 13px; }
+    main { padding: 58px 0 72px; }
+    .intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 34px; }
+    .eyebrow { margin: 0 0 9px; color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(34px, 5vw, 52px); letter-spacing: -.055em; line-height: 1.03; }
+    .subtitle { margin: 13px 0 0; color: var(--muted); font-size: 15px; }
+    .button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 9px; border: 1px solid var(--line); border-radius: 10px; padding: 0 16px; background: var(--panel-raised); color: var(--text); font-weight: 700; transition: background .15s, transform .15s; }
+    .button:hover { background: #2b3546; }
+    .button:active { transform: translateY(1px); }
+    .button-primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+    .button-primary:hover { background: #b9f879; }
+    .button-small { min-height: 36px; padding: 0 12px; font-size: 13px; }
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .search-wrap { position: relative; flex: 1; }
+    .search-icon { position: absolute; top: 50%; left: 15px; color: var(--muted); transform: translateY(-50%); pointer-events: none; }
+    .field { width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; outline: none; background: var(--panel); color: var(--text); }
+    .search-wrap .field { padding-left: 43px; }
+    .field:focus { border-color: #809759; box-shadow: 0 0 0 3px #a9ef571c; }
+    .field::placeholder { color: #788294; }
+    select.field { cursor: pointer; }
+    .toolbar select { width: 170px; }
+    .toolbar #sortFilter { width: 190px; }
+    .summary { display: flex; justify-content: space-between; margin: 0 1px 16px; color: var(--muted); font-size: 13px; }
+    .summary strong { color: var(--text); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(202px, 1fr)); gap: 20px; }
+    .game-card { overflow: hidden; border: 1px solid #272e3b; border-radius: 13px; background: var(--panel); transition: border-color .16s, transform .16s; }
+    .game-card:hover { transform: translateY(-3px); border-color: #536143; }
+    .cover { position: relative; display: grid; width: 100%; aspect-ratio: 2 / 2.6; place-items: center; overflow: hidden; padding: 8px; background: radial-gradient(ellipse at 50% 22%, #3b4a41 0, #26332f 28%, #1a2029 70%); color: #d7edb5; }
+    .cover img { display: block; width: 100%; height: 100%; border: 1px solid #465064; border-radius: 6px; background: #131720; object-fit: contain; }
+    .cover-placeholder { padding: 22px; font-size: 44px; font-weight: 850; letter-spacing: -.08em; text-align: center; text-shadow: 0 2px 20px #0008; }
+    .game-content { padding: 15px 15px 14px; }
+    .game-heading { min-height: 43px; margin: 0; font-size: 15px; font-weight: 750; letter-spacing: -.02em; line-height: 1.4; }
+    .game-description { display: -webkit-box; overflow: hidden; margin: 9px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+    .game-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; color: var(--muted); font-size: 12px; }
+    .status { display: inline-flex; align-items: center; gap: 6px; border-radius: 20px; padding: 5px 8px; background: #272e3a; color: #c3ccda; font-size: 10px; font-weight: 750; white-space: nowrap; }
+    .status::before { width: 6px; height: 6px; border-radius: 50%; background: #8490a3; content: ""; }
+    .status[data-status="Playing"] { background: #252f21; color: #cef3a1; }
+    .status[data-status="Playing"]::before { background: var(--accent); }
+    .status[data-status="Completed"] { background: #222d37; color: #9ed7f6; }
+    .status[data-status="Completed"]::before { background: #79c8f3; }
+    .card-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .card-actions .button { flex: 1; min-width: 0; }
+    .empty { grid-column: 1 / -1; border: 1px dashed var(--line); border-radius: 14px; padding: 65px 20px; color: var(--muted); text-align: center; }
+    .empty strong { display: block; margin-bottom: 8px; color: var(--text); font-size: 18px; }
+    dialog { width: min(660px, calc(100% - 28px)); max-height: min(90vh, 900px); overflow: hidden; border: 1px solid var(--line); border-radius: 16px; padding: 0; background: var(--panel); color: var(--text); box-shadow: 0 24px 90px #0009; }
+    dialog[open] { display: flex; flex-direction: column; }
+    dialog::backdrop { background: #07090dbb; backdrop-filter: blur(4px); }
+    #gameForm { display: flex; min-height: 0; flex-direction: column; }
+    .dialog-head, .dialog-foot { flex: 0 0 auto; }
+    .dialog-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 20px 24px; }
+    .dialog-head h2 { margin: 0; font-size: 20px; letter-spacing: -.03em; }
+    .icon-button { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--muted); font-size: 20px; }
+    .dialog-body { min-height: 0; flex: 1 1 auto; overflow-x: hidden; overflow-y: auto; padding: 22px 24px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-field { display: grid; gap: 7px; }
+    .form-field label { color: #c2c9d5; font-size: 12px; font-weight: 700; }
+    .form-field.full { grid-column: 1 / -1; }
+    textarea.field { min-height: 82px; padding: 12px 14px; resize: vertical; }
+    .cover-setting { display: flex; align-items: center; gap: 13px; border: 1px solid var(--line); border-radius: 11px; padding: 11px; background: #141923; }
+    .cover-preview { width: 50px; height: 66px; flex: 0 0 auto; overflow: hidden; border-radius: 5px; background: var(--panel-raised); }
+    .cover-preview img { width: 100%; height: 100%; border: 1px solid #465064; border-radius: 5px; object-fit: contain; }
+    .cover-setting-copy { flex: 1; min-width: 0; }
+    .cover-setting-copy strong { display: block; margin-bottom: 4px; font-size: 13px; }
+    .cover-setting-copy span { color: var(--muted); font-size: 11px; }
+    .cover-setting .button { min-height: 37px; padding: 0 11px; font-size: 12px; }
+    .cover-tools { display: grid; grid-template-columns: 1fr auto; gap: 9px; margin-top: 12px; }
+    .cover-upload { display: grid; gap: 6px; margin-top: 12px; }
+    .cover-upload label { color: #c2c9d5; font-size: 12px; font-weight: 700; }
+    #coverUploadInput { height: 40px; min-height: 40px; padding: 4px 10px; }
+    #coverUploadInput::file-selector-button { margin-right: 10px; border: 0; border-radius: 6px; padding: 6px 10px; background: var(--panel-raised); color: var(--text); font: inherit; cursor: pointer; }
+    #coverUploadInput::file-selector-button:hover { background: #2b3546; }
+    .cover-upload .help-text { margin: 0; }
+    .cover-upload + .help-text { margin-top: 0; }
+    .cover-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(142px, 1fr)); gap: 10px; margin-top: 12px; }
+    .cover-result { display: grid; grid-template-rows: 160px auto auto; gap: 7px; border: 1px solid var(--line); border-radius: 9px; padding: 8px; background: #141923; text-align: left; }
+    .cover-result:hover, .cover-result.selected { border-color: var(--accent); }
+    .cover-result img { width: 100%; height: 160px; border: 1px solid #465064; border-radius: 5px; background: var(--panel-raised); object-fit: contain; }
+    .cover-result .cover-placeholder { display: grid; min-height: 160px; place-items: center; border: 1px solid #465064; border-radius: 5px; background: var(--panel-raised); font-size: 30px; }
+    .cover-result strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .cover-result span { color: var(--muted); font-size: 10px; }
+    .help-text { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .error-text { color: var(--danger); }
+    .dialog-foot { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding: 16px 24px; }
+    .dialog-foot-right { display: flex; gap: 9px; margin-left: auto; }
+    .dialog-error { flex: 0 0 auto; margin: 0; border-top: 1px solid #5a303b; padding: 10px 24px; background: #321e26; color: #ffb4ba; font-size: 12px; line-height: 1.4; }
+    .dialog-error[hidden] { display: none; }
+    .toast { position: fixed; right: 24px; bottom: 24px; z-index: 5; max-width: min(420px, calc(100% - 48px)); border: 1px solid var(--line); border-radius: 10px; padding: 13px 16px; background: #242d3a; box-shadow: 0 10px 35px #0007; font-size: 13px; }
+    .toast[hidden] { display: none; }
+    .loading { opacity: .65; pointer-events: none; }
+    @media (max-width: 1100px) {
+      .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 640px) {
+      .shell { width: min(100% - 28px, 1440px); }
+      .topbar { height: 66px; }
+      .top-label { font-size: 11px; }
+      main { padding-top: 40px; }
+      .intro { align-items: start; flex-direction: column; }
+      .toolbar { align-items: stretch; flex-direction: column; }
+      .toolbar select { width: 100%; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .game-content { padding: 11px; }
+      .game-heading { min-height: 0; font-size: 13px; }
+      .game-meta { align-items: start; flex-direction: column; }
+      .card-actions { flex-direction: column; }
+      .card-actions .button { min-height: 33px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-field.full { grid-column: auto; }
+      .dialog-head, .dialog-body { padding-right: 17px; padding-left: 17px; }
+      .dialog-foot { padding-right: 17px; padding-left: 17px; }
+      .dialog-error { padding-right: 17px; padding-left: 17px; }
+      .cover-tools { grid-template-columns: 1fr; }
+      .dialog-foot .button { padding: 0 11px; }
+    }
+    @media (max-width: 420px) {
+      .grid { grid-template-columns: minmax(0, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">G</span><span>The Game Library</span></div>
+      <span class="top-label">Your collection, in one place</span>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="intro">
+      <div>
+        <p class="eyebrow">The personal collection</p>
+        <h1>Game library</h1>
+        <p class="subtitle">Keep track of what you own and what you want to play.</p>
+      </div>
+      <button class="button button-primary" id="addGameButton" type="button"><span aria-hidden="true">＋</span> Add a game</button>
+    </section>
+    <section aria-label="Your games">
+      <div class="toolbar">
+        <label class="search-wrap">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input class="field" id="filterInput" type="search" placeholder="Search your library…" autocomplete="off" aria-label="Search your library">
+        </label>
+        <select class="field" id="statusFilter" aria-label="Filter by status">
+          <option value="">All statuses</option>
+          <option>Backlog</option>
+          <option>Playing</option>
+          <option>Completed</option>
+          <option>On Hold</option>
+        </select>
+        <select class="field" id="sortFilter" aria-label="Sort games">
+          <option value="title-asc" selected>Title: A to Z</option>
+          <option value="library">Library order</option>
+          <option value="platform-asc">Platform: A to Z</option>
+          <option value="platform-desc">Platform: Z to A</option>
+        </select>
+      </div>
+      <div class="summary"><span id="gameCount">Loading your games…</span><span>Cover art powered by TheGamesDB</span></div>
+      <div class="grid" id="gameGrid" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <dialog id="gameDialog" aria-labelledby="dialogTitle">
+    <form id="gameForm">
+      <div class="dialog-head">
+        <h2 id="dialogTitle">Add a game</h2>
+        <button class="icon-button" type="button" id="closeDialogButton" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <div class="form-field full">
+            <label for="gameTitle">Game title</label>
+            <input class="field" id="gameTitle" name="title" required maxlength="160" placeholder="e.g. Alan Wake 2">
+          </div>
+          <div class="form-field">
+            <label for="gamePlatform">Platform</label>
+            <select class="field" id="gamePlatform" name="platform">
+              <optgroup label="Nintendo consoles">
+                <option>Nintendo Entertainment System</option>
+                <option>Super Nintendo Entertainment System</option>
+                <option>Nintendo 64</option>
+                <option>Nintendo GameCube</option>
+                <option>Wii</option>
+                <option>Wii U</option>
+                <option>Nintendo Switch</option>
+                <option>Nintendo Switch 2</option>
+              </optgroup>
+              <optgroup label="Nintendo handhelds">
+                <option>Game Boy</option>
+                <option>Game Boy Color</option>
+                <option>Game Boy Advance</option>
+                <option>Nintendo DS</option>
+                <option>Nintendo 3DS</option>
+                <option>New Nintendo 3DS</option>
+                <option>Virtual Boy</option>
+              </optgroup>
+              <optgroup label="PlayStation consoles">
+                <option>PlayStation</option>
+                <option>PlayStation 2</option>
+                <option>PlayStation 3</option>
+                <option>PlayStation 4</option>
+                <option selected>PlayStation 5</option>
+              </optgroup>
+              <optgroup label="PlayStation handhelds">
+                <option>PlayStation Portable (PSP)</option>
+                <option>PlayStation Vita</option>
+              </optgroup>
+              <optgroup label="Xbox consoles">
+                <option>Xbox</option>
+                <option>Xbox 360</option>
+                <option>Xbox One</option>
+                <option>Xbox One S</option>
+                <option>Xbox One X</option>
+                <option>Xbox Series S</option>
+                <option>Xbox Series X</option>
+              </optgroup>
+              <optgroup label="Other">
+                <option>PC</option>
+                <option value="custom">Other / custom platform…</option>
+              </optgroup>
+            </select>
+            <input class="field" id="customPlatform" maxlength="80" placeholder="Enter platform name" aria-label="Custom platform" hidden>
+          </div>
+          <div class="form-field">
+            <label for="gameYear">Release year</label>
+            <input class="field" id="gameYear" name="year" type="number" min="1950" max="2100" placeholder="e.g. 2024">
+          </div>
+          <div class="form-field full">
+            <label for="gameStatus">Status</label>
+            <select class="field" id="gameStatus" name="status">
+              <option>Backlog</option>
+              <option>Playing</option>
+              <option>Completed</option>
+              <option>On Hold</option>
+            </select>
+          </div>
+          <div class="form-field full">
+            <label for="gameDescription">Description</label>
+            <textarea class="field" id="gameDescription" name="description" maxlength="5000" placeholder="Select a game from TheGamesDB to fill in its description, or enter your own…"></textarea>
+          </div>
+          <div class="form-field full">
+            <label for="gameNotes">Notes</label>
+            <textarea class="field" id="gameNotes" name="notes" maxlength="2000" placeholder="Anything you want to remember…"></textarea>
+          </div>
+          <div class="form-field full">
+            <label>Game details and cover</label>
+            <div class="cover-setting">
+              <div class="cover-preview" id="coverPreview"></div>
+              <div class="cover-setting-copy"><strong>Local cover image</strong><span id="coverCaption">No cover selected yet</span></div>
+              <button class="button" id="removeCoverButton" type="button" hidden>Remove</button>
+            </div>
+            <div class="cover-tools">
+              <input class="field" id="coverSearchInput" type="search" placeholder="Search for a game…" aria-label="Search TheGamesDB for a game">
+              <button class="button button-small" id="coverSearchButton" type="button">Search games</button>
+            </div>
+            <div class="cover-upload">
+              <label for="coverUploadInput">Or choose your own cover</label>
+              <input class="field" id="coverUploadInput" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose your own cover image">
+              <p class="help-text">JPEG, PNG, or WebP · up to 12 MB</p>
+            </div>
+            <p class="help-text" id="coverHelp">Search for a match, or enter the details manually if game search is not configured.</p>
+            <div class="cover-results" id="coverResults"></div>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-foot">
+        <button class="button" id="deleteGameButton" type="button" hidden>Delete game</button>
+        <div class="dialog-foot-right">
+          <button class="button" id="cancelDialogButton" type="button">Cancel</button>
+          <button class="button button-primary" id="saveGameButton" type="submit">Save game</button>
+        </div>
+      </div>
+      <p class="dialog-error" id="dialogError" role="alert" hidden></p>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script>
+    const gameGrid = document.querySelector("#gameGrid");
+    const gameDialog = document.querySelector("#gameDialog");
+    const gameForm = document.querySelector("#gameForm");
+    const toast = document.querySelector("#toast");
+    let games = [];
+    let editingId = null;
+    let cover = "";
+    let toastTimeout;
+
+    async function api(path, options = {}) {
+      const isFormData = options.body instanceof FormData;
+      const response = await fetch(path, {
+        ...options,
+        headers: { ...(options.body && !isFormData ? { "Content-Type": "application/json" } : {}), ...options.headers }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
+      return payload;
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.hidden = false;
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => { toast.hidden = true; }, 3200);
+    }
+
+    function initials(title) {
+      return title.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "?";
+    }
+
+    function renderCover(container, game) {
+      container.replaceChildren();
+      if (game.cover) {
+        const image = document.createElement("img");
+        image.src = game.cover;
+        image.alt = `${game.title} cover`;
+        image.loading = "lazy";
+        image.onerror = () => {
+          container.replaceChildren();
+          const placeholder = document.createElement("span");
+          placeholder.className = "cover-placeholder";
+          placeholder.textContent = initials(game.title);
+          container.append(placeholder);
+        };
+        container.append(image);
+      } else {
+        const placeholder = document.createElement("span");
+        placeholder.className = "cover-placeholder";
+        placeholder.textContent = initials(game.title);
+        container.append(placeholder);
+      }
+    }
+
+    function renderGames() {
+      const text = document.querySelector("#filterInput").value.trim().toLowerCase();
+      const status = document.querySelector("#statusFilter").value;
+      const sort = document.querySelector("#sortFilter").value;
+      const filtered = games.filter((game) =>
+        (!status || game.status === status) &&
+        (!text || `${game.title} ${game.platform} ${game.description || ""} ${game.notes}`.toLowerCase().includes(text))
+      );
+      if (sort !== "library") {
+        const direction = sort === "platform-desc" ? -1 : 1;
+        const field = sort.startsWith("platform-") ? "platform" : "title";
+        filtered.sort((a, b) =>
+          direction * String(a[field] || "").localeCompare(String(b[field] || ""), undefined, { sensitivity: "base" }) ||
+          a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
+        );
+      }
+      gameGrid.replaceChildren();
+      document.querySelector("#gameCount").innerHTML =
+        `<strong>${filtered.length}</strong> ${filtered.length === 1 ? "game" : "games"}${filtered.length !== games.length ? ` shown · ${games.length} total` : ""}`;
+      if (filtered.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        const heading = document.createElement("strong");
+        heading.textContent = games.length ? "No games match that search" : "Your library is ready";
+        const detail = document.createElement("span");
+        detail.textContent = games.length ? "Try another title or filter." : "Add your first game to get started.";
+        empty.append(heading, detail);
+        gameGrid.append(empty);
+        return;
+      }
+      for (const game of filtered) {
+        const card = document.createElement("article");
+        card.className = "game-card";
+        const art = document.createElement("div");
+        art.className = "cover";
+        renderCover(art, game);
+        const content = document.createElement("div");
+        content.className = "game-content";
+        const title = document.createElement("h2");
+        title.className = "game-heading";
+        title.textContent = game.title;
+        const description = document.createElement("p");
+        description.className = "game-description";
+        description.textContent = game.description || "";
+        description.hidden = !game.description;
+        const meta = document.createElement("div");
+        meta.className = "game-meta";
+        const platform = document.createElement("span");
+        platform.textContent = [game.platform, game.year].filter(Boolean).join(" · ");
+        const badge = document.createElement("span");
+        badge.className = "status";
+        badge.dataset.status = game.status;
+        badge.textContent = game.status;
+        meta.append(platform, badge);
+        const actions = document.createElement("div");
+        actions.className = "card-actions";
+        const edit = document.createElement("button");
+        edit.className = "button button-small";
+        edit.type = "button";
+        edit.textContent = "Edit details";
+        edit.addEventListener("click", () => openEditor(game));
+        const findCover = document.createElement("button");
+        findCover.className = "button button-small";
+        findCover.type = "button";
+        findCover.textContent = game.cover ? "Change cover" : "Find cover";
+        findCover.addEventListener("click", () => openEditor(game, true));
+        actions.append(edit, findCover);
+        content.append(title);
+        if (game.description) content.append(description);
+        content.append(meta, actions);
+        card.append(art, content);
+        gameGrid.append(card);
+      }
+    }
+
+    function updateCoverPreview() {
+      const preview = document.querySelector("#coverPreview");
+      preview.replaceChildren();
+      if (cover) {
+        const image = document.createElement("img");
+        image.src = cover;
+        image.alt = "Selected game cover";
+        preview.append(image);
+        document.querySelector("#coverCaption").textContent = "Saved on this server";
+        document.querySelector("#removeCoverButton").hidden = false;
+      } else {
+        document.querySelector("#coverCaption").textContent = "No cover selected yet";
+        document.querySelector("#removeCoverButton").hidden = true;
+      }
+    }
+
+    function updatePlatformSelection(platform = "") {
+      const select = document.querySelector("#gamePlatform");
+      const custom = document.querySelector("#customPlatform");
+      const options = [...select.options];
+      const match = options.find((option) => option.value === platform && option.value !== "custom");
+      if (match) {
+        select.value = platform;
+        custom.value = "";
+        custom.hidden = true;
+      } else {
+        select.value = "custom";
+        custom.value = platform;
+        custom.hidden = false;
+      }
+    }
+
+    function openEditor(game = null, searchCovers = false) {
+      editingId = game?.id ?? null;
+      cover = game?.cover ?? "";
+      gameForm.reset();
+      document.querySelector("#dialogTitle").textContent = game ? "Edit game" : "Add a game";
+      document.querySelector("#gameTitle").value = game?.title ?? "";
+      updatePlatformSelection(game?.platform ?? "PlayStation 5");
+      document.querySelector("#gameYear").value = game?.year ?? "";
+      document.querySelector("#gameStatus").value = game?.status ?? "Backlog";
+      document.querySelector("#gameDescription").value = game?.description ?? "";
+      document.querySelector("#gameNotes").value = game?.notes ?? "";
+      document.querySelector("#coverSearchInput").value = game?.title ?? "";
+      document.querySelector("#coverResults").replaceChildren();
+      document.querySelector("#coverHelp").textContent = "Search for a match, or enter the details manually if game search is not configured.";
+      document.querySelector("#coverHelp").classList.remove("error-text");
+      document.querySelector("#dialogError").hidden = true;
+      document.querySelector("#dialogError").textContent = "";
+      document.querySelector("#deleteGameButton").hidden = !game;
+      document.querySelector("#saveGameButton").textContent = game ? "Save changes" : "Add game";
+      updateCoverPreview();
+      gameDialog.showModal();
+      if (searchCovers) searchForCovers();
+    }
+
+    async function loadGames() {
+      const response = await api("/api/games");
+      games = response.games;
+      renderGames();
+    }
+
+    async function searchForGames() {
+      const query = document.querySelector("#coverSearchInput").value.trim() || document.querySelector("#gameTitle").value.trim();
+      const help = document.querySelector("#coverHelp");
+      const results = document.querySelector("#coverResults");
+      if (!query) {
+        help.textContent = "Enter a game title before searching.";
+        help.classList.add("error-text");
+        return;
+      }
+      help.textContent = "Searching TheGamesDB…";
+      help.classList.remove("error-text");
+      results.replaceChildren();
+      document.querySelector("#coverSearchButton").disabled = true;
+      try {
+        const response = await api(`/api/search?q=${encodeURIComponent(query)}`);
+        if (!response.results.length) {
+          help.textContent = "No games found. Try another title or a shorter search.";
+          return;
+        }
+        help.textContent = `${response.results.length} matching game${response.results.length === 1 ? "" : "s"} — select the correct title and platform.`;
+        for (const result of response.results) {
+          const button = document.createElement("button");
+          button.className = "cover-result";
+          button.type = "button";
+          if (result.preview) {
+            const image = document.createElement("img");
+            image.src = result.preview;
+            image.alt = "";
+            image.loading = "lazy";
+            button.append(image);
+          } else {
+            const placeholder = document.createElement("span");
+            placeholder.className = "cover-placeholder";
+            placeholder.textContent = initials(result.title);
+            button.append(placeholder);
+          }
+          const title = document.createElement("strong");
+          title.textContent = result.title;
+          const detail = document.createElement("span");
+          detail.textContent = [result.platform, result.year].filter(Boolean).join(" · ") || "TheGamesDB";
+          button.append(title, detail);
+          button.addEventListener("click", async () => {
+            document.querySelector("#gameTitle").value = result.title;
+            updatePlatformSelection(result.platform || document.querySelector("#gamePlatform").value);
+            document.querySelector("#gameYear").value = result.year || "";
+            document.querySelector("#gameDescription").value = result.description || "";
+            document.querySelector("#coverSearchInput").value = result.title;
+            document.querySelectorAll(".cover-result").forEach((item) => item.classList.remove("selected"));
+            button.classList.add("selected");
+            cover = "";
+            updateCoverPreview();
+            const descriptionMessage = result.description
+              ? result.descriptionSource && result.descriptionSource !== result.platform
+                ? `Description found on TheGamesDB's ${result.descriptionSource} listing.`
+                : "Description loaded from TheGamesDB."
+              : "TheGamesDB has no description for this listing; you can enter one above.";
+            if (!result.imageUrl) {
+              help.textContent = `Game title, platform, and year loaded. ${descriptionMessage} No cover is available for this result; upload one below if you like.`;
+              return;
+            }
+            button.disabled = true;
+            help.textContent = `Game details loaded. ${descriptionMessage} Downloading its cover…`;
+            try {
+              const downloaded = await api("/api/covers/download", {
+                method: "POST",
+                body: JSON.stringify({ imageUrl: result.imageUrl })
+              });
+              cover = downloaded.cover;
+              updateCoverPreview();
+              help.textContent = `Game details and cover loaded. ${descriptionMessage} Save the game to keep your changes.`;
+              showToast("Cover downloaded to your server.");
+            } catch (error) {
+              help.textContent = `Game details loaded, but cover download failed: ${error.message}`;
+              help.classList.add("error-text");
+              button.disabled = false;
+            }
+          });
+          results.append(button);
+        }
+      } catch (error) {
+        help.textContent = error.message;
+        help.classList.add("error-text");
+      } finally {
+        document.querySelector("#coverSearchButton").disabled = false;
+      }
+    }
+
+    gameForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const saveButton = document.querySelector("#saveGameButton");
+      saveButton.disabled = true;
+      const errorMessage = document.querySelector("#dialogError");
+      errorMessage.hidden = true;
+      errorMessage.textContent = "";
+      try {
+        const data = {
+          title: document.querySelector("#gameTitle").value.trim(),
+          platform: document.querySelector("#gamePlatform").value === "custom"
+            ? document.querySelector("#customPlatform").value.trim()
+            : document.querySelector("#gamePlatform").value,
+          year: document.querySelector("#gameYear").value,
+          status: document.querySelector("#gameStatus").value,
+          description: document.querySelector("#gameDescription").value.trim(),
+          notes: document.querySelector("#gameNotes").value.trim(),
+          cover
+        };
+        const path = editingId ? `/api/games/${encodeURIComponent(editingId)}` : "/api/games";
+        await api(path, { method: editingId ? "PUT" : "POST", body: JSON.stringify(data) });
+        gameDialog.close();
+        await loadGames();
+        showToast(editingId ? "Game updated." : "Game added to your library.");
+      } catch (error) {
+        errorMessage.textContent = error.message;
+        errorMessage.hidden = false;
+      } finally {
+        saveButton.disabled = false;
+      }
+    });
+
+    document.querySelector("#deleteGameButton").addEventListener("click", async () => {
+      const game = games.find((item) => item.id === editingId);
+      if (!game || !confirm(`Remove "${game.title}" from your library?`)) return;
+      try {
+        await api(`/api/games/${encodeURIComponent(editingId)}`, { method: "DELETE" });
+        gameDialog.close();
+        await loadGames();
+        showToast("Game removed from your library.");
+      } catch (error) {
+        showToast(error.message);
+      }
+    });
+
+    document.querySelector("#removeCoverButton").addEventListener("click", () => {
+      cover = "";
+      updateCoverPreview();
+    });
+    document.querySelector("#gamePlatform").addEventListener("change", (event) => {
+      const custom = document.querySelector("#customPlatform");
+      custom.hidden = event.target.value !== "custom";
+      if (!custom.hidden) custom.focus();
+    });
+    document.querySelector("#coverUploadInput").addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      const help = document.querySelector("#coverHelp");
+      if (!file) return;
+      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+        help.textContent = "Choose a JPEG, PNG, or WebP image.";
+        help.classList.add("error-text");
+        event.target.value = "";
+        return;
+      }
+      if (file.size > 12 * 1024 * 1024) {
+        help.textContent = "The cover image must be 12 MB or smaller.";
+        help.classList.add("error-text");
+        event.target.value = "";
+        return;
+      }
+      help.textContent = "Uploading your cover…";
+      help.classList.remove("error-text");
+      const upload = new FormData();
+      upload.append("cover", file);
+      event.target.disabled = true;
+      try {
+        const result = await api("/api/covers/upload", { method: "POST", body: upload });
+        cover = result.cover;
+        updateCoverPreview();
+        help.textContent = "Your cover is uploaded. Save the game to keep your changes.";
+      } catch (error) {
+        help.textContent = error.message;
+        help.classList.add("error-text");
+      } finally {
+        event.target.disabled = false;
+        event.target.value = "";
+      }
+    });
+    document.querySelector("#addGameButton").addEventListener("click", () => openEditor());
+    document.querySelector("#closeDialogButton").addEventListener("click", () => gameDialog.close("cancel"));
+    document.querySelector("#cancelDialogButton").addEventListener("click", () => gameDialog.close("cancel"));
+    document.querySelector("#coverSearchButton").addEventListener("click", searchForGames);
+    document.querySelector("#coverSearchInput").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        searchForGames();
+      }
+    });
+    document.querySelector("#filterInput").addEventListener("input", renderGames);
+    document.querySelector("#statusFilter").addEventListener("change", renderGames);
+    document.querySelector("#sortFilter").addEventListener("change", renderGames);
+
+    loadGames().catch((error) => {
+      document.querySelector("#gameCount").textContent = "Could not load your games.";
+      showToast(error.message);
+    });
+  </script>
+</body>
+</html>

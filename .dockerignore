@@ -1,0 +1,8 @@
+.thegamesdb-key
+config/thegamesdb-key
+.git
+__pycache__
+*.pyc
+server.py
+README.md
+compose.yaml
