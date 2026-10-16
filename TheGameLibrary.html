@@ -177,6 +177,7 @@
       </div>
       <div class="intro-actions">
         <button class="button" id="settingsButton" type="button">Settings</button>
+        <button class="button" id="exportCsvButton" type="button">Export CSV</button>
         <button class="button button-primary" id="addGameButton" type="button"><span aria-hidden="true">＋</span> Add a game</button>
       </div>
     </section>
@@ -192,6 +193,9 @@
           <option>Playing</option>
           <option>Completed</option>
           <option>On Hold</option>
+        </select>
+        <select class="field" id="platformFilter" aria-label="Filter by platform">
+          <option value="">All platforms</option>
         </select>
         <select class="field" id="sortFilter" aria-label="Sort games">
           <option value="title-asc" selected>Title: A to Z</option>
@@ -212,6 +216,15 @@
         <button class="icon-button" type="button" id="closeDialogButton" aria-label="Close">×</button>
       </div>
       <div class="dialog-body">
+        <h3>Online Search</h3>
+        <div class="cover-tools">
+          <input class="field" id="coverSearchInput" type="search" placeholder="Search for a game…" aria-label="Search TheGamesDB for a game">
+          <button class="button button-small" id="coverSearchButton" type="button">Search games</button>
+        </div>
+        <p class="help-text" id="coverHelp">Search TheGamesDB and select a result to fill in game details and cover art.</p>
+        <div class="cover-results" id="coverResults"></div>
+
+        <h3>Manual entry</h3>
         <div class="form-grid">
           <div class="form-field full">
             <label for="gameTitle">Game title</label>
@@ -294,17 +307,11 @@
               <div class="cover-setting-copy"><strong>Local cover image</strong><span id="coverCaption">No cover selected yet</span></div>
               <button class="button" id="removeCoverButton" type="button" hidden>Remove</button>
             </div>
-            <div class="cover-tools">
-              <input class="field" id="coverSearchInput" type="search" placeholder="Search for a game…" aria-label="Search TheGamesDB for a game">
-              <button class="button button-small" id="coverSearchButton" type="button">Search games</button>
-            </div>
             <div class="cover-upload">
               <label for="coverUploadInput">Or choose your own cover</label>
               <input class="field" id="coverUploadInput" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose your own cover image">
               <p class="help-text">JPEG, PNG, or WebP · up to 12 MB</p>
             </div>
-            <p class="help-text" id="coverHelp">Search for a match, or enter the details manually if game search is not configured.</p>
-            <div class="cover-results" id="coverResults"></div>
           </div>
         </div>
       </div>
@@ -473,9 +480,11 @@
     function renderGames() {
       const text = document.querySelector("#filterInput").value.trim().toLowerCase();
       const status = document.querySelector("#statusFilter").value;
+      const platform = document.querySelector("#platformFilter").value;
       const sort = document.querySelector("#sortFilter").value;
       const filtered = games.filter((game) =>
         (!status || game.status === status) &&
+        (!platform || game.platform === platform) &&
         (!text || `${game.title} ${game.platform} ${game.description || ""} ${game.notes}`.toLowerCase().includes(text))
       );
       if (sort !== "library") {
@@ -545,6 +554,47 @@
       }
     }
 
+    function exportGamesCsv() {
+      const columns = [
+        ["ID", "id"],
+        ["Title", "title"],
+        ["Platform", "platform"],
+        ["Year", "year"],
+        ["Status", "status"],
+        ["Description", "description"],
+        ["Notes", "notes"],
+        ["Cover", "cover"]
+      ];
+      const escapeCsv = (value) => {
+        const text = String(value ?? "");
+        const safeText = /^[\t\r\n ]*[=+\-@]/.test(text) ? `'${text}` : text;
+        return `"${safeText.replaceAll('"', '""')}"`;
+      };
+      const rows = [
+        columns.map(([heading]) => escapeCsv(heading)),
+        ...games.map((game) => columns.map(([, key]) => escapeCsv(game[key])))
+      ];
+      const csv = `\uFEFF${rows.map((row) => row.join(",")).join("\r\n")}\r\n`;
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `game-library-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function updatePlatformFilter() {
+      const filter = document.querySelector("#platformFilter");
+      const selectedPlatform = filter.value;
+      const platforms = [...new Set(games.map((game) => game.platform).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+      filter.replaceChildren(new Option("All platforms", ""));
+      for (const platform of platforms) {
+        filter.add(new Option(platform, platform));
+      }
+      filter.value = platforms.includes(selectedPlatform) ? selectedPlatform : "";
+    }
+
     function updateCoverPreview() {
       const preview = document.querySelector("#coverPreview");
       preview.replaceChildren();
@@ -590,7 +640,7 @@
       document.querySelector("#gameNotes").value = game?.notes ?? "";
       document.querySelector("#coverSearchInput").value = game?.title ?? "";
       document.querySelector("#coverResults").replaceChildren();
-      document.querySelector("#coverHelp").textContent = "Search for a match, or enter the details manually if game search is not configured.";
+      document.querySelector("#coverHelp").textContent = "Search TheGamesDB and select a result to fill in game details and cover art.";
       document.querySelector("#coverHelp").classList.remove("error-text");
       document.querySelector("#dialogError").hidden = true;
       document.querySelector("#dialogError").textContent = "";
@@ -604,6 +654,7 @@
     async function loadGames() {
       const response = await api("/api/games");
       games = response.games;
+      updatePlatformFilter();
       renderGames();
     }
 
@@ -905,7 +956,9 @@
     });
     document.querySelector("#filterInput").addEventListener("input", renderGames);
     document.querySelector("#statusFilter").addEventListener("change", renderGames);
+    document.querySelector("#platformFilter").addEventListener("change", renderGames);
     document.querySelector("#sortFilter").addEventListener("change", renderGames);
+    document.querySelector("#exportCsvButton").addEventListener("click", exportGamesCsv);
 
     api("/api/settings/accent-color").then((response) => {
       savedAccentColor = response.color;

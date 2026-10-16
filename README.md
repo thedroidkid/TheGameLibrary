@@ -6,7 +6,8 @@ A self-hosted web app for tracking a personal game collection. Add and edit game
 
 - Add, edit, and remove games from the web interface.
 - Track platform, release year, status, description, and notes.
-- Sort the library by title or platform and filter by title or status.
+- Sort the library by title or platform and filter by title, status, or platform.
+- Export the full game library to a spreadsheet-friendly CSV file.
 - Optionally search TheGamesDB for game details and cover art.
 - Upload a personal JPEG, PNG, or WebP cover (up to 12 MB).
 - Store the library and covers persistently when running in Docker.
