@@ -1,6 +1,6 @@
 services:
   game-library:
-    image: droidkid/thegamelibrary:latest
+    image: droidkid/thegamelibrary:${GAME_LIBRARY_VERSION:-latest}
     restart: unless-stopped
     init: true
     ports:
