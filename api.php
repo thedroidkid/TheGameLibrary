@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 const MAX_COVER_BYTES = 12582912;
+const DEFAULT_ACCENT_COLOR = '#a9ef57';
 
 $root = __DIR__;
 $dataDir = getenv('GAME_LIBRARY_DATA_DIR') ?: $root;
@@ -72,27 +73,53 @@ function api_key_is_configured(string $keyFile): bool
     return trim($apiKey) !== '';
 }
 
-function save_api_key(string $keyFile, string $apiKey): void
+function write_private_file(string $filePath, string $contents, string $temporaryPrefix, string $description): void
 {
-    $directory = dirname($keyFile);
+    $directory = dirname($filePath);
     if (!is_dir($directory) || !is_writable($directory)) {
-        throw new RuntimeException('The TheGamesDB API key directory is not writable.');
+        throw new RuntimeException('The ' . $description . ' directory is not writable.');
     }
-    $temporaryFile = tempnam($directory, '.thegamesdb-key-');
+    $temporaryFile = tempnam($directory, $temporaryPrefix);
     if ($temporaryFile === false) {
-        throw new RuntimeException('Could not create a temporary API key file.');
+        throw new RuntimeException('Could not create a temporary ' . $description . ' file.');
     }
     try {
-        if (file_put_contents($temporaryFile, $apiKey . "\n", LOCK_EX) === false
+        if (file_put_contents($temporaryFile, $contents, LOCK_EX) === false
             || !chmod($temporaryFile, 0600)
-            || !rename($temporaryFile, $keyFile)) {
-            throw new RuntimeException('Could not save the TheGamesDB API key.');
+            || !rename($temporaryFile, $filePath)) {
+            throw new RuntimeException('Could not save the ' . $description . '.');
         }
     } finally {
         if (is_file($temporaryFile) && !unlink($temporaryFile)) {
-            error_log('The Game Library: could not remove a temporary TheGamesDB API key file.');
+            error_log('The Game Library: could not remove a temporary ' . $description . ' file.');
         }
     }
+}
+
+function save_api_key(string $keyFile, string $apiKey): void
+{
+    write_private_file($keyFile, $apiKey . "\n", '.thegamesdb-key-', 'TheGamesDB API key');
+}
+
+function read_accent_color(string $colorFile): string
+{
+    if (!is_file($colorFile)) {
+        return DEFAULT_ACCENT_COLOR;
+    }
+    $color = file_get_contents($colorFile);
+    if ($color === false) {
+        throw new RuntimeException('Could not read the accent color setting.');
+    }
+    $color = trim($color);
+    if (!preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+        throw new RuntimeException('The saved accent color setting is invalid.');
+    }
+    return strtolower($color);
+}
+
+function save_accent_color(string $colorFile, string $color): void
+{
+    write_private_file($colorFile, strtolower($color) . "\n", '.accent-color-', 'accent color setting');
 }
 
 function with_games_lock(string $lockFile, callable $callback): mixed
@@ -416,6 +443,27 @@ try {
                 throw new RuntimeException('Could not remove the TheGamesDB API key.');
             }
             send_json(200, ['configured' => false]);
+        }
+    }
+    if ($route === 'settings/accent-color') {
+        $colorFile = $dataDir . '/accent-color';
+        if ($method === 'GET') {
+            send_json(200, ['color' => read_accent_color($colorFile)]);
+        }
+        if ($method === 'PUT') {
+            $payload = read_json_body();
+            $color = $payload['color'] ?? null;
+            if (!is_string($color) || !preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+                throw new ApiError('Enter a HEX color in #RRGGBB format.');
+            }
+            save_accent_color($colorFile, $color);
+            send_json(200, ['color' => strtolower($color)]);
+        }
+        if ($method === 'DELETE') {
+            if (file_exists($colorFile) && !unlink($colorFile)) {
+                throw new RuntimeException('Could not reset the accent color setting.');
+            }
+            send_json(200, ['color' => DEFAULT_ACCENT_COLOR]);
         }
     }
     if ($method === 'GET' && $route === 'search') {

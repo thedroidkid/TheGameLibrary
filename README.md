@@ -43,13 +43,13 @@ Then open `http://SERVER-IP:8091/`.
 
 ### Optional TheGamesDB search
 
-The app starts without an API key. In the app, open **Settings**, enter a TheGamesDB API key, and save it. The key is stored in the persistent Docker data volume and takes effect immediately; it is not returned to the browser.
+The app starts without an API key. In the app, open **Settings**, enter a TheGamesDB API key, and save it. The key is stored in the persistent Docker data volume and takes effect immediately; it is not returned to the browser. In the same settings dialog, users can choose an accent color or enter a HEX value; the selected color is shared by everyone and stored in that volume.
 
 For existing deployments, a key in `config/thegamesdb-key` is imported into the data volume when no key has been saved there yet. Keep this file private and do not commit it or include it in a public deployment.
 
 ## Data, persistence, and backups
 
-Docker stores the game list, cover images, and TheGamesDB API key in the persistent `library-data` volume. The first time the container starts with a new volume, it copies the empty starter `games.json` into that volume. Rebuilding or replacing the container keeps the volume and its contents.
+Docker stores the game list, cover images, TheGamesDB API key, and accent color in the persistent `library-data` volume. The first time the container starts with a new volume, it copies the empty starter `games.json` into that volume. Rebuilding or replacing the container keeps the volume and its contents.
 
 Useful commands:
 
@@ -70,7 +70,7 @@ docker run --rm \
   alpine tar -czf /backup/game-library-data-backup.tar.gz -C /data .
 ```
 
-The exact volume name can differ if Compose uses a project name. Check it with `docker volume ls` and substitute the actual name for `game-library_library-data`. Store backups somewhere safe; they contain the library, uploaded cover images, and TheGamesDB API key.
+The exact volume name can differ if Compose uses a project name. Check it with `docker volume ls` and substitute the actual name for `game-library_library-data`. Store backups somewhere safe; they contain the library, uploaded cover images, API key, and appearance settings.
 
 **Do not run `docker compose down -v` unless you intend to delete the persistent game library.**
 

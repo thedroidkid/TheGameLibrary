@@ -40,14 +40,14 @@
     .button:hover { background: #2b3546; }
     .button:active { transform: translateY(1px); }
     .button-primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
-    .button-primary:hover { background: #b9f879; }
+    .button-primary:hover { background: color-mix(in srgb, var(--accent), white 15%); }
     .button-small { min-height: 36px; padding: 0 12px; font-size: 13px; }
     .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
     .search-wrap { position: relative; flex: 1; }
     .search-icon { position: absolute; top: 50%; left: 15px; color: var(--muted); transform: translateY(-50%); pointer-events: none; }
     .field { width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; outline: none; background: var(--panel); color: var(--text); }
     .search-wrap .field { padding-left: 43px; }
-    .field:focus { border-color: #809759; box-shadow: 0 0 0 3px #a9ef571c; }
+    .field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
     .field::placeholder { color: #788294; }
     select.field { cursor: pointer; }
     .toolbar select { width: 170px; }
@@ -84,9 +84,14 @@
     .dialog-head h2 { margin: 0; font-size: 20px; letter-spacing: -.03em; }
     .icon-button { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--muted); font-size: 20px; }
     .dialog-body { min-height: 0; flex: 1 1 auto; overflow-x: hidden; overflow-y: auto; padding: 22px 24px; }
+    .dialog-body h3 { margin: 0 0 12px; font-size: 16px; }
+    .dialog-body h3:not(:first-child) { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 20px; }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .form-field { display: grid; gap: 7px; }
     .form-field label { color: #c2c9d5; font-size: 12px; font-weight: 700; }
+    .accent-picker-row { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 10px; }
+    .accent-picker { width: 64px; height: 46px; padding: 5px; cursor: pointer; }
+    .accent-actions { display: flex; gap: 9px; }
     .form-field.full { grid-column: 1 / -1; }
     textarea.field { min-height: 82px; padding: 12px 14px; resize: vertical; }
     .cover-setting { display: flex; align-items: center; gap: 13px; border: 1px solid var(--line); border-radius: 11px; padding: 11px; background: #141923; }
@@ -146,6 +151,9 @@
       .dialog-foot { padding-right: 17px; padding-left: 17px; }
       .dialog-error { padding-right: 17px; padding-left: 17px; }
       .cover-tools { grid-template-columns: 1fr; }
+      .accent-picker-row { grid-template-columns: 56px 1fr; }
+      .accent-picker { width: 56px; }
+      .accent-actions { grid-column: 1 / -1; }
       .dialog-foot .button { padding: 0 11px; }
     }
     @media (max-width: 420px) {
@@ -310,13 +318,27 @@
       <p class="dialog-error" id="dialogError" role="alert" hidden></p>
     </form>
   </dialog>
-  <dialog id="apiKeyDialog" aria-labelledby="apiKeyDialogTitle">
-    <form class="settings-form" id="apiKeyForm">
+  <dialog id="settingsDialog" aria-labelledby="settingsDialogTitle">
+    <form class="settings-form" id="settingsForm">
       <div class="dialog-head">
-        <h2 id="apiKeyDialogTitle">TheGamesDB settings</h2>
-        <button class="icon-button" type="button" id="closeApiKeyDialogButton" aria-label="Close">×</button>
+        <h2 id="settingsDialogTitle">Settings</h2>
+        <button class="icon-button" type="button" id="closeSettingsDialogButton" aria-label="Close">×</button>
       </div>
       <div class="dialog-body">
+        <h3>Appearance</h3>
+        <div class="form-field">
+          <label for="accentHexInput">Accent color</label>
+          <div class="accent-picker-row">
+            <input class="field accent-picker" id="accentColorInput" type="color" value="#a9ef57" aria-label="Choose accent color">
+            <input class="field" id="accentHexInput" type="text" value="#a9ef57" inputmode="text" maxlength="7" pattern="^#[0-9a-fA-F]{6}$" autocomplete="off" spellcheck="false" aria-label="Accent color HEX value" aria-describedby="accentColorHelp" required>
+            <div class="accent-actions">
+              <button class="button button-small" id="resetAccentButton" type="button">Reset</button>
+              <button class="button button-small button-primary" id="saveAccentButton" type="button">Save color</button>
+            </div>
+          </div>
+          <p class="help-text" id="accentColorHelp">Choose a color or enter a HEX value like #a9ef57. This setting is shared by everyone and saved on the server.</p>
+        </div>
+        <h3>TheGamesDB</h3>
         <p class="help-text" id="apiKeyStatus" role="status" aria-live="polite">Checking saved key…</p>
         <div class="form-field">
           <label for="theGamesDbKey">TheGamesDB API key</label>
@@ -327,7 +349,7 @@
       <div class="dialog-foot">
         <button class="button" id="removeApiKeyButton" type="button" hidden>Remove key</button>
         <div class="dialog-foot-right">
-          <button class="button" id="cancelApiKeyDialogButton" type="button">Cancel</button>
+          <button class="button" id="cancelSettingsDialogButton" type="button">Cancel</button>
           <button class="button button-primary" id="saveApiKeyButton" type="submit">Save key</button>
         </div>
       </div>
@@ -339,14 +361,15 @@
   <script>
     const gameGrid = document.querySelector("#gameGrid");
     const gameDialog = document.querySelector("#gameDialog");
-    const apiKeyDialog = document.querySelector("#apiKeyDialog");
+    const settingsDialog = document.querySelector("#settingsDialog");
     const gameForm = document.querySelector("#gameForm");
-    const apiKeyForm = document.querySelector("#apiKeyForm");
+    const settingsForm = document.querySelector("#settingsForm");
     const toast = document.querySelector("#toast");
     let games = [];
     let editingId = null;
     let cover = "";
     let toastTimeout;
+    let savedAccentColor = "#a9ef57";
 
     async function api(path, options = {}) {
       const isFormData = options.body instanceof FormData;
@@ -366,25 +389,51 @@
       toastTimeout = setTimeout(() => { toast.hidden = true; }, 3200);
     }
 
+    function applyAccentColor(color) {
+      document.documentElement.style.setProperty("--accent", color);
+      const value = Number.parseInt(color.slice(1), 16);
+      const red = ((value >> 16) & 255) / 255;
+      const green = ((value >> 8) & 255) / 255;
+      const blue = (value & 255) / 255;
+      const linear = [red, green, blue].map((channel) =>
+        channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+      );
+      const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+      document.documentElement.style.setProperty("--accent-ink", luminance > 0.179 ? "#10131b" : "#f3f5fa");
+    }
+
+    function updateAccentInputs(color) {
+      document.querySelector("#accentColorInput").value = color;
+      document.querySelector("#accentHexInput").value = color;
+      document.querySelector("#saveAccentButton").disabled = !/^#[0-9a-fA-F]{6}$/.test(color)
+        || color.toLowerCase() === savedAccentColor;
+    }
+
     async function openApiKeySettings() {
       const status = document.querySelector("#apiKeyStatus");
       const removeButton = document.querySelector("#removeApiKeyButton");
       const saveButton = document.querySelector("#saveApiKeyButton");
       const errorMessage = document.querySelector("#apiKeyError");
-      apiKeyForm.reset();
+      settingsForm.reset();
       errorMessage.hidden = true;
       errorMessage.textContent = "";
       status.textContent = "Checking saved key…";
       status.classList.remove("error-text");
       removeButton.hidden = true;
       saveButton.disabled = true;
-      apiKeyDialog.showModal();
+      settingsDialog.showModal();
       try {
-        const response = await api("/api/settings/thegamesdb-key");
-        status.textContent = response.configured
+        const [keyResponse, colorResponse] = await Promise.all([
+          api("/api/settings/thegamesdb-key"),
+          api("/api/settings/accent-color")
+        ]);
+        status.textContent = keyResponse.configured
           ? "A key is saved. Enter a new key below to replace it."
           : "No key is saved yet.";
-        removeButton.hidden = !response.configured;
+        removeButton.hidden = !keyResponse.configured;
+        savedAccentColor = colorResponse.color;
+        updateAccentInputs(savedAccentColor);
+        applyAccentColor(savedAccentColor);
       } catch (error) {
         status.textContent = error.message;
         status.classList.add("error-text");
@@ -677,7 +726,7 @@
       }
     });
 
-    apiKeyForm.addEventListener("submit", async (event) => {
+    settingsForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const saveButton = document.querySelector("#saveApiKeyButton");
       const removeButton = document.querySelector("#removeApiKeyButton");
@@ -691,7 +740,7 @@
           method: "PUT",
           body: JSON.stringify({ key: document.querySelector("#theGamesDbKey").value })
         });
-        apiKeyDialog.close();
+        settingsDialog.close();
         showToast("TheGamesDB API key saved.");
       } catch (error) {
         errorMessage.textContent = error.message;
@@ -713,7 +762,7 @@
       errorMessage.textContent = "";
       try {
         await api("/api/settings/thegamesdb-key", { method: "DELETE" });
-        apiKeyDialog.close();
+        settingsDialog.close();
         showToast("TheGamesDB API key removed.");
       } catch (error) {
         errorMessage.textContent = error.message;
@@ -782,8 +831,69 @@
     });
     document.querySelector("#addGameButton").addEventListener("click", () => openEditor());
     document.querySelector("#settingsButton").addEventListener("click", openApiKeySettings);
-    document.querySelector("#closeApiKeyDialogButton").addEventListener("click", () => apiKeyDialog.close("cancel"));
-    document.querySelector("#cancelApiKeyDialogButton").addEventListener("click", () => apiKeyDialog.close("cancel"));
+    document.querySelector("#closeSettingsDialogButton").addEventListener("click", () => settingsDialog.close("cancel"));
+    document.querySelector("#cancelSettingsDialogButton").addEventListener("click", () => settingsDialog.close("cancel"));
+    document.querySelector("#accentColorInput").addEventListener("input", (event) => {
+      updateAccentInputs(event.target.value);
+      applyAccentColor(event.target.value);
+    });
+    document.querySelector("#accentHexInput").addEventListener("input", (event) => {
+      const color = event.target.value.trim();
+      const valid = /^#[0-9a-fA-F]{6}$/.test(color);
+      document.querySelector("#saveAccentButton").disabled = !valid || color.toLowerCase() === savedAccentColor;
+      if (valid) {
+        document.querySelector("#accentColorInput").value = color;
+        applyAccentColor(color);
+      }
+    });
+    document.querySelector("#accentHexInput").addEventListener("change", (event) => {
+      const color = event.target.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(color)) updateAccentInputs(color.toLowerCase());
+    });
+    document.querySelector("#saveAccentButton").addEventListener("click", async () => {
+      const color = document.querySelector("#accentHexInput").value.trim();
+      const saveButton = document.querySelector("#saveAccentButton");
+      if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+        document.querySelector("#accentHexInput").reportValidity();
+        return;
+      }
+      saveButton.disabled = true;
+      try {
+        const response = await api("/api/settings/accent-color", {
+          method: "PUT",
+          body: JSON.stringify({ color })
+        });
+        savedAccentColor = response.color;
+        updateAccentInputs(savedAccentColor);
+        applyAccentColor(savedAccentColor);
+        showToast("Accent color saved.");
+      } catch (error) {
+        showToast(error.message);
+        saveButton.disabled = false;
+      }
+    });
+    document.querySelector("#resetAccentButton").addEventListener("click", async () => {
+      const resetButton = document.querySelector("#resetAccentButton");
+      const saveButton = document.querySelector("#saveAccentButton");
+      resetButton.disabled = true;
+      saveButton.disabled = true;
+      try {
+        const response = await api("/api/settings/accent-color", { method: "DELETE" });
+        savedAccentColor = response.color;
+        updateAccentInputs(savedAccentColor);
+        applyAccentColor(savedAccentColor);
+        showToast("Accent color reset to default.");
+      } catch (error) {
+        showToast(error.message);
+        saveButton.disabled = false;
+      } finally {
+        resetButton.disabled = false;
+      }
+    });
+    settingsDialog.addEventListener("close", () => {
+      updateAccentInputs(savedAccentColor);
+      applyAccentColor(savedAccentColor);
+    });
     document.querySelector("#closeDialogButton").addEventListener("click", () => gameDialog.close("cancel"));
     document.querySelector("#cancelDialogButton").addEventListener("click", () => gameDialog.close("cancel"));
     document.querySelector("#coverSearchButton").addEventListener("click", searchForGames);
@@ -796,6 +906,13 @@
     document.querySelector("#filterInput").addEventListener("input", renderGames);
     document.querySelector("#statusFilter").addEventListener("change", renderGames);
     document.querySelector("#sortFilter").addEventListener("change", renderGames);
+
+    api("/api/settings/accent-color").then((response) => {
+      savedAccentColor = response.color;
+      applyAccentColor(savedAccentColor);
+    }).catch((error) => {
+      showToast(`Could not load the saved accent color: ${error.message}`);
+    });
 
     loadGames().catch((error) => {
       document.querySelector("#gameCount").textContent = "Could not load your games.";
