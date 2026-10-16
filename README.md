@@ -29,7 +29,7 @@ A self-hosted web app for tracking a personal game collection. Add and edit game
 3. Open the app from a device that can reach the server:
 
    ```text
-   http://SERVER-IP:8080/TheGameLibrary.html
+   http://SERVER-IP:8080/
    ```
 
 By default, Docker publishes the app on port 8080. To use a different port, set `GAME_LIBRARY_PORT` when starting the container:
@@ -39,7 +39,7 @@ docker compose pull
 GAME_LIBRARY_PORT=8091 docker compose up -d
 ```
 
-Then open `http://SERVER-IP:8091/TheGameLibrary.html`.
+Then open `http://SERVER-IP:8091/`.
 
 ### Optional TheGamesDB search
 
