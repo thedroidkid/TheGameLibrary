@@ -18,11 +18,12 @@ A self-hosted web app for tracking a personal game collection. Add and edit game
 
 ## Quick start with Docker Compose
 
-1. Copy or clone this project onto the Linux server. Keep `compose.yaml`, `Dockerfile`, `api.php`, `TheGameLibrary.html`, and the `docker/` directory together.
-2. From the project directory, build and start the app:
+1. Copy or clone this project onto the Linux server. The deployment needs `compose.yaml` and the `config/` directory; the application image is pulled from Docker Hub.
+2. From the project directory, pull and start the app:
 
    ```bash
-   docker compose up -d --build
+   docker compose pull
+   docker compose up -d
    ```
 
 3. Open the app from a device that can reach the server:
@@ -34,7 +35,8 @@ A self-hosted web app for tracking a personal game collection. Add and edit game
 By default, Docker publishes the app on port 8080. To use a different port, set `GAME_LIBRARY_PORT` when starting the container:
 
 ```bash
-GAME_LIBRARY_PORT=8091 docker compose up -d --build
+docker compose pull
+GAME_LIBRARY_PORT=8091 docker compose up -d
 ```
 
 Then open `http://SERVER-IP:8091/TheGameLibrary.html`.
