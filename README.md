@@ -5,6 +5,7 @@ A self-hosted web app for tracking a personal game collection. Add and edit game
 ## Features
 
 - Add, edit, and remove games from the web interface.
+- Click a game's title or cover to view its full details and edit it from that view.
 - Track platform, release year, status, description, and notes.
 - Sort the library by title or platform and filter by title, status, or platform.
 - Export the full game library to a spreadsheet-friendly CSV file.

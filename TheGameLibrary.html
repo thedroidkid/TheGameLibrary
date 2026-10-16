@@ -58,10 +58,13 @@
     .game-card { overflow: hidden; border: 1px solid #272e3b; border-radius: 13px; background: var(--panel); transition: border-color .16s, transform .16s; }
     .game-card:hover { transform: translateY(-3px); border-color: #536143; }
     .cover { position: relative; display: grid; width: 100%; aspect-ratio: 2 / 2.6; place-items: center; overflow: hidden; padding: 8px; background: radial-gradient(ellipse at 50% 22%, #3b4a41 0, #26332f 28%, #1a2029 70%); color: #d7edb5; }
+    button.cover { border: 0; font: inherit; cursor: pointer; }
     .cover img { display: block; width: 100%; height: 100%; border: 1px solid #465064; border-radius: 6px; background: #131720; object-fit: contain; }
     .cover-placeholder { padding: 22px; font-size: 44px; font-weight: 850; letter-spacing: -.08em; text-align: center; text-shadow: 0 2px 20px #0008; }
     .game-content { padding: 15px 15px 14px; }
     .game-heading { min-height: 43px; margin: 0; font-size: 15px; font-weight: 750; letter-spacing: -.02em; line-height: 1.4; }
+    .game-title-button { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .game-title-button:hover { color: var(--accent); }
     .game-description { display: -webkit-box; overflow: hidden; margin: 9px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
     .game-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; color: var(--muted); font-size: 12px; }
     .status { display: inline-flex; align-items: center; gap: 6px; border-radius: 20px; padding: 5px 8px; background: #272e3a; color: #c3ccda; font-size: 10px; font-weight: 750; white-space: nowrap; }
@@ -86,6 +89,15 @@
     .dialog-body { min-height: 0; flex: 1 1 auto; overflow-x: hidden; overflow-y: auto; padding: 22px 24px; }
     .dialog-body h3 { margin: 0 0 12px; font-size: 16px; }
     .dialog-body h3:not(:first-child) { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 20px; }
+    .details-overview { display: flex; align-items: start; gap: 20px; }
+    .details-cover { width: 138px; flex: 0 0 auto; border-radius: 7px; }
+    .details-meta { display: grid; flex: 1; gap: 13px; margin: 0; }
+    .details-meta div { min-width: 0; }
+    .details-meta dt { margin-bottom: 4px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .details-meta dd { margin: 0; overflow-wrap: anywhere; font-size: 14px; }
+    .details-section { margin-top: 24px; }
+    .details-section h3 { margin: 0 0 8px; font-size: 15px; }
+    .details-text { margin: 0; color: #c2c9d5; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .form-field { display: grid; gap: 7px; }
     .form-field label { color: #c2c9d5; font-size: 12px; font-weight: 700; }
@@ -326,6 +338,35 @@
       <p class="dialog-error" id="dialogError" role="alert" hidden></p>
     </form>
   </dialog>
+  <dialog id="detailsDialog" aria-labelledby="detailsTitle">
+    <div class="dialog-head">
+      <h2 id="detailsTitle"></h2>
+      <button class="icon-button" type="button" id="closeDetailsButton" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body">
+      <div class="details-overview">
+        <div class="cover details-cover" id="detailsCover"></div>
+        <dl class="details-meta">
+          <div><dt>Platform</dt><dd id="detailsPlatform"></dd></div>
+          <div><dt>Release year</dt><dd id="detailsYear"></dd></div>
+          <div><dt>Status</dt><dd><span class="status" id="detailsStatus"></span></dd></div>
+        </dl>
+      </div>
+      <section class="details-section">
+        <h3>Description</h3>
+        <p class="details-text" id="detailsDescription"></p>
+      </section>
+      <section class="details-section" id="detailsNotesSection" hidden>
+        <h3>Notes</h3>
+        <p class="details-text" id="detailsNotes"></p>
+      </section>
+    </div>
+    <div class="dialog-foot">
+      <div class="dialog-foot-right">
+        <button class="button button-primary" type="button" id="editFromDetailsButton">Edit game</button>
+      </div>
+    </div>
+  </dialog>
   <dialog id="settingsDialog" aria-labelledby="settingsDialogTitle">
     <form class="settings-form" id="settingsForm">
       <div class="dialog-head">
@@ -370,6 +411,7 @@
   <script>
     const gameGrid = document.querySelector("#gameGrid");
     const gameDialog = document.querySelector("#gameDialog");
+    const detailsDialog = document.querySelector("#detailsDialog");
     const settingsDialog = document.querySelector("#settingsDialog");
     const gameForm = document.querySelector("#gameForm");
     const settingsForm = document.querySelector("#settingsForm");
@@ -514,14 +556,24 @@
       for (const game of filtered) {
         const card = document.createElement("article");
         card.className = "game-card";
-        const art = document.createElement("div");
+        const art = document.createElement("button");
         art.className = "cover";
+        art.type = "button";
+        art.setAttribute("aria-label", `View details for ${game.title}`);
+        art.setAttribute("aria-haspopup", "dialog");
+        art.addEventListener("click", () => openGameDetails(game));
         renderCover(art, game);
         const content = document.createElement("div");
         content.className = "game-content";
         const title = document.createElement("h2");
         title.className = "game-heading";
-        title.textContent = game.title;
+        const titleButton = document.createElement("button");
+        titleButton.className = "game-title-button";
+        titleButton.type = "button";
+        titleButton.setAttribute("aria-haspopup", "dialog");
+        titleButton.textContent = game.title;
+        titleButton.addEventListener("click", () => openGameDetails(game));
+        title.append(titleButton);
         const description = document.createElement("p");
         description.className = "game-description";
         description.textContent = game.description || "";
@@ -537,23 +589,37 @@
         meta.append(platform, badge);
         const actions = document.createElement("div");
         actions.className = "card-actions";
-        const edit = document.createElement("button");
-        edit.className = "button button-small";
-        edit.type = "button";
-        edit.textContent = "Edit details";
-        edit.addEventListener("click", () => openEditor(game));
         const findCover = document.createElement("button");
         findCover.className = "button button-small";
         findCover.type = "button";
         findCover.textContent = game.cover ? "Change cover" : "Find cover";
         findCover.addEventListener("click", () => openEditor(game, true));
-        actions.append(edit, findCover);
+        actions.append(findCover);
         content.append(title);
         if (game.description) content.append(description);
         content.append(meta, actions);
         card.append(art, content);
         gameGrid.append(card);
       }
+    }
+
+    function openGameDetails(game) {
+      document.querySelector("#detailsTitle").textContent = game.title;
+      renderCover(document.querySelector("#detailsCover"), game);
+      document.querySelector("#detailsPlatform").textContent = game.platform || "Not set";
+      document.querySelector("#detailsYear").textContent = game.year || "Not set";
+      const status = document.querySelector("#detailsStatus");
+      status.dataset.status = game.status;
+      status.textContent = game.status;
+      document.querySelector("#detailsDescription").textContent = game.description || "No description has been added.";
+      const notesSection = document.querySelector("#detailsNotesSection");
+      notesSection.hidden = !game.notes;
+      document.querySelector("#detailsNotes").textContent = game.notes || "";
+      document.querySelector("#editFromDetailsButton").onclick = () => {
+        detailsDialog.close();
+        openEditor(game);
+      };
+      detailsDialog.showModal();
     }
 
     function exportGamesCsv() {
@@ -949,6 +1015,7 @@
     });
     document.querySelector("#closeDialogButton").addEventListener("click", () => gameDialog.close("cancel"));
     document.querySelector("#cancelDialogButton").addEventListener("click", () => gameDialog.close("cancel"));
+    document.querySelector("#closeDetailsButton").addEventListener("click", () => detailsDialog.close("cancel"));
     document.querySelector("#coverSearchButton").addEventListener("click", searchForGames);
     document.querySelector("#coverSearchInput").addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
