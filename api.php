@@ -60,6 +60,41 @@ function read_json_body(): array
     return $payload;
 }
 
+function api_key_is_configured(string $keyFile): bool
+{
+    if (!is_file($keyFile)) {
+        return false;
+    }
+    $apiKey = file_get_contents($keyFile);
+    if ($apiKey === false) {
+        throw new RuntimeException('Could not read the TheGamesDB API key file.');
+    }
+    return trim($apiKey) !== '';
+}
+
+function save_api_key(string $keyFile, string $apiKey): void
+{
+    $directory = dirname($keyFile);
+    if (!is_dir($directory) || !is_writable($directory)) {
+        throw new RuntimeException('The TheGamesDB API key directory is not writable.');
+    }
+    $temporaryFile = tempnam($directory, '.thegamesdb-key-');
+    if ($temporaryFile === false) {
+        throw new RuntimeException('Could not create a temporary API key file.');
+    }
+    try {
+        if (file_put_contents($temporaryFile, $apiKey . "\n", LOCK_EX) === false
+            || !chmod($temporaryFile, 0600)
+            || !rename($temporaryFile, $keyFile)) {
+            throw new RuntimeException('Could not save the TheGamesDB API key.');
+        }
+    } finally {
+        if (is_file($temporaryFile) && !unlink($temporaryFile)) {
+            error_log('The Game Library: could not remove a temporary TheGamesDB API key file.');
+        }
+    }
+}
+
 function with_games_lock(string $lockFile, callable $callback): mixed
 {
     $lock = fopen($lockFile, 'c');
@@ -358,6 +393,30 @@ try {
     if ($method === 'GET' && $route === 'games') {
         $games = with_games_lock($coversDir . '/.games.lock', fn() => read_games_file($gamesFile));
         send_json(200, ['games' => $games]);
+    }
+    if ($route === 'settings/thegamesdb-key') {
+        if ($method === 'GET') {
+            send_json(200, ['configured' => api_key_is_configured($keyFile)]);
+        }
+        if ($method === 'PUT') {
+            $payload = read_json_body();
+            $apiKey = $payload['key'] ?? null;
+            if (!is_string($apiKey)) {
+                throw new ApiError('Enter a valid TheGamesDB API key.');
+            }
+            $apiKey = trim($apiKey);
+            if ($apiKey === '' || strlen($apiKey) > 512 || preg_match('/[\x00-\x1F\x7F]/', $apiKey)) {
+                throw new ApiError('Enter a TheGamesDB API key of 1 to 512 characters.');
+            }
+            save_api_key($keyFile, $apiKey);
+            send_json(200, ['configured' => true]);
+        }
+        if ($method === 'DELETE') {
+            if (file_exists($keyFile) && !unlink($keyFile)) {
+                throw new RuntimeException('Could not remove the TheGamesDB API key.');
+            }
+            send_json(200, ['configured' => false]);
+        }
     }
     if ($method === 'GET' && $route === 'search') {
         $query = trim((string)($_GET['q'] ?? ''));

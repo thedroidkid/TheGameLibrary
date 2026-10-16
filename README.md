@@ -43,23 +43,13 @@ Then open `http://SERVER-IP:8091/`.
 
 ### Optional TheGamesDB search
 
-The app starts without an API key. In that mode, users can create games by filling out the form and can upload cover images. The catalog search button will explain that search has not been configured.
+The app starts without an API key. In the app, open **Settings**, enter a TheGamesDB API key, and save it. The key is stored in the persistent Docker data volume and takes effect immediately; it is not returned to the browser.
 
-To enable TheGamesDB search, provide your own key in `config/thegamesdb-key` on the server:
-
-```bash
-mkdir -p config
-chmod 700 config
-printf '%s\n' 'YOUR_THEGAMESDB_KEY' > config/thegamesdb-key
-chmod 600 config/thegamesdb-key
-docker compose restart game-library
-```
-
-Replace the example value with your key. Keep this file private and do not commit it or include it in a public deployment. The Compose setup mounts the `config/` directory read-only, and the Docker build excludes the key.
+For existing deployments, a key in `config/thegamesdb-key` is imported into the data volume when no key has been saved there yet. Keep this file private and do not commit it or include it in a public deployment.
 
 ## Data, persistence, and backups
 
-Docker stores the game list and cover images in the persistent `library-data` volume. The first time the container starts with a new volume, it copies the empty starter `games.json` into that volume. Rebuilding or replacing the container keeps the volume and its contents.
+Docker stores the game list, cover images, and TheGamesDB API key in the persistent `library-data` volume. The first time the container starts with a new volume, it copies the empty starter `games.json` into that volume. Rebuilding or replacing the container keeps the volume and its contents.
 
 Useful commands:
 
@@ -80,19 +70,19 @@ docker run --rm \
   alpine tar -czf /backup/game-library-data-backup.tar.gz -C /data .
 ```
 
-The exact volume name can differ if Compose uses a project name. Check it with `docker volume ls` and substitute the actual name for `game-library_library-data`. Store backups somewhere safe; they contain the library and uploaded cover images.
+The exact volume name can differ if Compose uses a project name. Check it with `docker volume ls` and substitute the actual name for `game-library_library-data`. Store backups somewhere safe; they contain the library, uploaded cover images, and TheGamesDB API key.
 
 **Do not run `docker compose down -v` unless you intend to delete the persistent game library.**
 
 ## Security
 
-The app currently has no user accounts or login. Anyone who can reach it can view, add, edit, or delete games. Keep it on a trusted home network, and do not expose its port directly to the public internet. If you need remote access, use a VPN or put it behind an authenticated reverse proxy.
+The app currently has no user accounts or login. Anyone who can reach it can view, add, edit, or delete games, and replace or remove the shared TheGamesDB API key. Keep it on a trusted home network, and do not expose its port directly to the public internet. If you need remote access, use a VPN or put it behind an authenticated reverse proxy.
 
 ## Troubleshooting
 
 - **The page does not open:** Check `docker compose ps`, confirm the port is reachable from your network, and make sure another service is not already using it. Try another port with `GAME_LIBRARY_PORT=8091`.
 - **The page loads but games do not:** Check the API and container logs with `docker compose logs --tail=100 game-library`.
-- **Search is unavailable:** Manual entry still works. To use search, configure `config/thegamesdb-key` and restart the container.
+- **Search is unavailable:** Manual entry still works. To use search, add a TheGamesDB API key in the app's Settings.
 - **Uploads fail:** The app accepts JPEG, PNG, and WebP images up to 12 MB. Check available disk space in Docker storage.
 - **Changes disappeared:** Confirm the `library-data` volume is still attached. Do not remove it with `docker compose down -v`.
 
