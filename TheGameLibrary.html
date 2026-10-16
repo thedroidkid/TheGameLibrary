@@ -117,6 +117,7 @@
     .cover-result strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
     .cover-result span { color: var(--muted); font-size: 10px; }
     .help-text { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .app-version { margin-top: 24px; text-align: right; }
     .error-text { color: var(--danger); }
     .dialog-foot { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding: 16px 24px; }
     .dialog-foot-right { display: flex; gap: 9px; margin-left: auto; }
@@ -352,6 +353,7 @@
           <input class="field" id="theGamesDbKey" name="key" type="password" maxlength="512" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="Paste your API key" required>
         </div>
         <p class="help-text">The key is stored on this server and is not sent back to your browser. It is shared by everyone using this library. Anyone who can access this app can replace or remove it.</p>
+        <p class="help-text app-version">Version v1.2</p>
       </div>
       <div class="dialog-foot">
         <button class="button" id="removeApiKeyButton" type="button" hidden>Remove key</button>
