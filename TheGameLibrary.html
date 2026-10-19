@@ -32,7 +32,7 @@
     .top-label { color: var(--muted); font-size: 13px; }
     main { padding: 58px 0 72px; }
     .intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 34px; }
-    .intro-actions { display: flex; gap: 10px; }
+    .intro-actions { display: flex; flex-wrap: wrap; gap: 10px; }
     .eyebrow { margin: 0 0 9px; color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
     h1 { margin: 0; font-size: clamp(34px, 5vw, 52px); letter-spacing: -.055em; line-height: 1.03; }
     .subtitle { margin: 13px 0 0; color: var(--muted); font-size: 15px; }
@@ -128,6 +128,21 @@
     .cover-result .cover-placeholder { display: grid; min-height: 160px; place-items: center; border: 1px solid #465064; border-radius: 5px; background: var(--panel-raised); font-size: 30px; }
     .cover-result strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
     .cover-result span { color: var(--muted); font-size: 10px; }
+    .import-platform { display: grid; gap: 12px; }
+    .import-custom-field[hidden] { display: none; }
+    .folder-picker { position: relative; display: grid; min-height: 46px; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--muted); font-size: 13px; }
+    .folder-picker:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
+    .folder-picker-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+    .folder-picker-label { max-width: 100%; overflow: hidden; padding: 0 12px; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+    .import-list { display: grid; gap: 8px; margin-top: 14px; }
+    .import-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; background: #141923; }
+    .import-row input { accent-color: var(--accent); }
+    .import-row-title { overflow: hidden; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+    .import-row-path { overflow: hidden; margin-top: 3px; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .import-row-status { color: var(--muted); font-size: 11px; text-align: right; }
+    .import-row-status.duplicate, .import-row-status.invalid { color: #ffd27a; }
+    .import-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .import-actions[hidden] { display: none; }
     .help-text { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
     .app-version { margin-top: 24px; text-align: right; }
     .error-text { color: var(--danger); }
@@ -191,6 +206,7 @@
       <div class="intro-actions">
         <button class="button" id="settingsButton" type="button">Settings</button>
         <button class="button" id="exportCsvButton" type="button">Export CSV</button>
+        <button class="button" id="importFolderButton" type="button">Import from folder</button>
         <button class="button button-primary" id="addGameButton" type="button"><span aria-hidden="true">＋</span> Add a game</button>
       </div>
     </section>
@@ -338,6 +354,48 @@
       <p class="dialog-error" id="dialogError" role="alert" hidden></p>
     </form>
   </dialog>
+  <dialog id="importDialog" aria-labelledby="importDialogTitle">
+    <div class="dialog-head">
+      <h2 id="importDialogTitle">Import games from a folder</h2>
+      <button class="icon-button" type="button" id="closeImportDialogButton" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body">
+      <p class="help-text">Choose the platform and a folder. The scan checks ROM filenames only; it never uploads or reads your game files. Review the matches and duplicates before importing.</p>
+      <div class="form-grid import-platform">
+        <div class="form-field">
+          <label for="importPlatform">Platform</label>
+          <select class="field" id="importPlatform" required>
+            <option value="" selected disabled>Choose a platform…</option>
+          </select>
+        </div>
+        <div class="form-field import-custom-field" id="importCustomPlatformField" hidden>
+          <label for="importCustomPlatform">Custom platform</label>
+          <input class="field" id="importCustomPlatform" maxlength="80" placeholder="Enter platform name">
+        </div>
+        <div class="form-field full">
+          <label for="importFolderInput">ROM folder</label>
+          <div class="folder-picker">
+            <input class="folder-picker-input" id="importFolderInput" type="file" webkitdirectory directory multiple aria-describedby="importFolderHelp">
+            <span class="folder-picker-label" id="importFolderLabel" aria-hidden="true">Choose a folder</span>
+          </div>
+          <p class="help-text" id="importFolderHelp">Choose a folder on the device you’re using now. Only recognized ROM file names are included.</p>
+        </div>
+      </div>
+      <div class="import-actions" id="importSelectionActions" hidden>
+        <button class="button button-small" id="selectImportGamesButton" type="button">Select all non-duplicates</button>
+        <button class="button button-small" id="clearImportGamesButton" type="button">Clear selection</button>
+      </div>
+      <p class="help-text" id="importSummary" role="status" aria-live="polite">Choose a platform and folder to preview games.</p>
+      <div class="import-list" id="importList"></div>
+      <p class="dialog-error" id="importError" role="alert" hidden></p>
+    </div>
+    <div class="dialog-foot">
+      <div class="dialog-foot-right">
+        <button class="button" id="cancelImportDialogButton" type="button">Cancel</button>
+        <button class="button button-primary" id="confirmImportButton" type="button" disabled>Import selected</button>
+      </div>
+    </div>
+  </dialog>
   <dialog id="detailsDialog" aria-labelledby="detailsTitle">
     <div class="dialog-head">
       <h2 id="detailsTitle"></h2>
@@ -394,7 +452,7 @@
           <input class="field" id="theGamesDbKey" name="key" type="password" maxlength="512" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="Paste your API key" required>
         </div>
         <p class="help-text">The key is stored on this server and is not sent back to your browser. It is shared by everyone using this library. Anyone who can access this app can replace or remove it.</p>
-        <p class="help-text app-version">Version v1.3</p>
+        <p class="help-text app-version">Version v1.4</p>
       </div>
       <div class="dialog-foot">
         <button class="button" id="removeApiKeyButton" type="button" hidden>Remove key</button>
@@ -411,6 +469,7 @@
   <script>
     const gameGrid = document.querySelector("#gameGrid");
     const gameDialog = document.querySelector("#gameDialog");
+    const importDialog = document.querySelector("#importDialog");
     const detailsDialog = document.querySelector("#detailsDialog");
     const settingsDialog = document.querySelector("#settingsDialog");
     const gameForm = document.querySelector("#gameForm");
@@ -421,6 +480,16 @@
     let cover = "";
     let toastTimeout;
     let savedAccentColor = "#a9ef57";
+    let importCandidates = [];
+    let importFolderScanned = false;
+
+    const ROM_EXTENSIONS = new Set([
+      "3ds", "32x", "a26", "a78", "adf", "bin", "ccd", "cdi", "chd", "cso", "cue", "d64",
+      "dol", "dsk", "elf", "gcm", "gcz", "gb", "gba", "gbc", "gen", "gg", "gdi", "iso",
+      "j64", "lnx", "md", "mdf", "n64", "nds", "nes", "nrg", "nsp", "pbp", "pce", "pkg",
+      "rvz", "sfc", "sgx", "smc", "smd", "sms", "wad", "wbfs", "wud", "wux", "xci", "z64",
+      "zip", "7z", "rar"
+    ]);
 
     async function api(path, options = {}) {
       const isFormData = options.body instanceof FormData;
@@ -649,6 +718,200 @@
       link.download = `game-library-${new Date().toISOString().slice(0, 10)}.csv`;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function normalizedGameTitle(title) {
+      return title.normalize("NFKD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    }
+
+    function titleFromRomFilename(filename) {
+      const extensionIndex = filename.lastIndexOf(".");
+      if (extensionIndex < 1) return "";
+      return filename.slice(0, extensionIndex)
+        .replace(/\[(?:!|!?[uejwp]\d*|[bhoptaf]\d*|t\+[a-z0-9+_-]+|usa|europe|japan|world|rev(?:ision)?[ ._-]*\d+)\]/gi, " ")
+        .replace(/\((?:usa|europe|japan|world|en(?:, ?(?:ja|fr|de|es|it))?|rev(?:ision)?[ ._-]*\d+|disc[ ._-]*\d+|disk[ ._-]*\d+|cd[ ._-]*\d+|proto(?:type)?|beta)\)/gi, " ")
+        .replace(/(?:^|[\s._-])(?:disc|disk|cd)[\s._-]*\d+(?=$|[\s._-])/gi, " ")
+        .replace(/_+/g, " ")
+        .replace(/\.(?!\s)/g, " ")
+        .replace(/\s+/g, " ")
+        .replace(/^[\s-]+|[\s-]+$/g, "")
+        .trim();
+    }
+
+    function importPlatformValue() {
+      const platform = document.querySelector("#importPlatform").value;
+      if (platform !== "custom") return platform;
+      return document.querySelector("#importCustomPlatform").value.trim();
+    }
+
+    function setupImportPlatforms() {
+      const select = document.querySelector("#importPlatform");
+      const gamePlatform = document.querySelector("#gamePlatform");
+      for (const group of gamePlatform.children) {
+        if (group instanceof HTMLOptGroupElement) {
+          const clonedGroup = document.createElement("optgroup");
+          clonedGroup.label = group.label;
+          for (const option of group.children) {
+            if (option.value !== "custom") clonedGroup.append(new Option(option.textContent, option.value));
+          }
+          if ([...clonedGroup.children].length) select.append(clonedGroup);
+        } else if (group.value && group.value !== "custom") {
+          select.append(new Option(group.textContent, group.value));
+        }
+      }
+      const otherGroup = [...select.querySelectorAll("optgroup")].find((group) => group.label === "Other");
+      if (otherGroup) otherGroup.append(new Option("Other / custom platform…", "custom"));
+    }
+
+    function renderImportPreview() {
+      const platform = importPlatformValue();
+      const list = document.querySelector("#importList");
+      const summary = document.querySelector("#importSummary");
+      const actions = document.querySelector("#importSelectionActions");
+      const confirmButton = document.querySelector("#confirmImportButton");
+      const error = document.querySelector("#importError");
+      const platformInput = document.querySelector("#importCustomPlatform");
+      const hasPlatform = Boolean(platform) && platform.length <= 80;
+      const existingTitles = new Set(
+        games.filter((game) => (game.platform || "").toLowerCase() === platform.toLowerCase())
+          .map((game) => normalizedGameTitle(game.title))
+      );
+      const seenTitles = new Set();
+      let libraryDuplicates = 0;
+      let scanDuplicates = 0;
+      let invalidTitles = 0;
+      for (const candidate of importCandidates) {
+        candidate.libraryDuplicate = hasPlatform && existingTitles.has(normalizedGameTitle(candidate.title));
+        candidate.scanDuplicate = hasPlatform && seenTitles.has(normalizedGameTitle(candidate.title));
+        candidate.invalid = !candidate.title || candidate.title.length > 160;
+        candidate.platform = platform;
+        if (candidate.libraryDuplicate) libraryDuplicates++;
+        if (candidate.scanDuplicate) scanDuplicates++;
+        if (candidate.invalid) invalidTitles++;
+        if (hasPlatform) {
+          candidate.selected = candidate.selected && !candidate.invalid && !candidate.libraryDuplicate && !candidate.scanDuplicate;
+        }
+        seenTitles.add(normalizedGameTitle(candidate.title));
+      }
+      list.replaceChildren();
+      if (!importCandidates.length) {
+        summary.textContent = importFolderScanned
+          ? "No supported ROM files were found in that folder."
+          : "Choose a platform and folder to preview games.";
+      } else if (!hasPlatform) {
+        summary.textContent = platform === "custom"
+          ? "Enter a custom platform name to check for duplicates and preview the import."
+          : "Choose a platform to check for duplicates and preview the import.";
+      } else {
+        const validCount = importCandidates.length - invalidTitles;
+        const duplicateDetails = [];
+        if (libraryDuplicates) duplicateDetails.push(`${libraryDuplicates} already in your library`);
+        if (scanDuplicates) duplicateDetails.push(`${scanDuplicates} repeated in this folder`);
+        summary.textContent = `${validCount} supported ROM ${validCount === 1 ? "file" : "files"} found. ${duplicateDetails.length ? `${duplicateDetails.join("; ")}.` : "No duplicates found."}${invalidTitles ? ` ${invalidTitles} could not be imported.` : ""}`;
+      }
+      for (const [index, candidate] of importCandidates.entries()) {
+        const row = document.createElement("label");
+        row.className = "import-row";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = candidate.selected;
+        checkbox.disabled = !hasPlatform || candidate.invalid;
+        checkbox.dataset.importIndex = String(index);
+        const title = document.createElement("span");
+        title.className = "import-row-title";
+        title.textContent = candidate.title || "Could not infer a title";
+        const details = document.createElement("span");
+        details.className = "import-row-path";
+        details.textContent = candidate.path;
+        details.title = candidate.path;
+        const copy = document.createElement("span");
+        copy.append(title, details);
+        const status = document.createElement("span");
+        status.className = "import-row-status";
+        if (!hasPlatform) {
+          status.textContent = "Choose platform";
+        } else if (candidate.invalid) {
+          status.textContent = candidate.title ? "Title too long" : "No title";
+          status.classList.add("invalid");
+        } else if (candidate.libraryDuplicate) {
+          status.textContent = "Already in library";
+          status.classList.add("duplicate");
+        } else if (candidate.scanDuplicate) {
+          status.textContent = "Duplicate in folder";
+          status.classList.add("duplicate");
+        } else {
+          status.textContent = "New";
+        }
+        row.append(checkbox, copy, status);
+        list.append(row);
+      }
+      actions.hidden = !importCandidates.length;
+      error.hidden = true;
+      error.textContent = "";
+      updateImportButton();
+      confirmButton.disabled = !hasPlatform || !importCandidates.some((candidate) => candidate.selected);
+      if (platform === "custom" && platformInput.value.trim().length > 80) {
+        summary.textContent = "Platform must be 80 characters or fewer.";
+      }
+    }
+
+    function updateImportButton() {
+      const count = importCandidates.filter((candidate) => candidate.selected && !candidate.invalid).length;
+      document.querySelector("#confirmImportButton").textContent = `Import selected (${count})`;
+      const platform = importPlatformValue();
+      document.querySelector("#confirmImportButton").disabled = !platform || platform.length > 80 || count === 0;
+    }
+
+    async function importSelectedGames() {
+      const button = document.querySelector("#confirmImportButton");
+      const error = document.querySelector("#importError");
+      const selected = importCandidates.filter((candidate) => candidate.selected && !candidate.invalid);
+      if (!selected.length) return;
+      button.disabled = true;
+      error.hidden = true;
+      error.textContent = "";
+      let imported = 0;
+      const failures = [];
+      for (const [index, candidate] of selected.entries()) {
+        document.querySelector("#importSummary").textContent = `Importing game ${index + 1} of ${selected.length}: ${candidate.title}`;
+        try {
+          await api("/api/games", {
+            method: "POST",
+            body: JSON.stringify({
+              title: candidate.title,
+              platform: candidate.platform,
+              year: "",
+              status: "Backlog",
+              notes: "",
+              description: "",
+              cover: ""
+            })
+          });
+          candidate.selected = false;
+          imported++;
+        } catch (requestError) {
+          failures.push(`${candidate.title}: ${requestError.message}`);
+        }
+      }
+      if (imported) {
+        try {
+          await loadGames();
+          renderImportPreview();
+        } catch (loadError) {
+          error.textContent = `${imported} games were imported, but the library could not be refreshed: ${loadError.message}`;
+          error.hidden = false;
+          button.disabled = false;
+          return;
+        }
+      }
+      if (failures.length) {
+        error.textContent = `${imported} imported. Could not import: ${failures.join("; ")}`;
+        error.hidden = false;
+        button.disabled = false;
+      } else {
+        importDialog.close();
+        showToast(`${imported} ${imported === 1 ? "game" : "games"} imported.`);
+      }
     }
 
     function updatePlatformFilter() {
@@ -949,6 +1212,63 @@
       }
     });
     document.querySelector("#addGameButton").addEventListener("click", () => openEditor());
+    document.querySelector("#importFolderButton").addEventListener("click", () => {
+      document.querySelector("#importPlatform").value = "";
+      document.querySelector("#importCustomPlatform").value = "";
+      document.querySelector("#importCustomPlatformField").hidden = true;
+      document.querySelector("#importFolderInput").value = "";
+      document.querySelector("#importFolderLabel").textContent = "Choose a folder";
+      importFolderScanned = false;
+      importCandidates = [];
+      renderImportPreview();
+      importDialog.showModal();
+    });
+    document.querySelector("#closeImportDialogButton").addEventListener("click", () => importDialog.close("cancel"));
+    document.querySelector("#cancelImportDialogButton").addEventListener("click", () => importDialog.close("cancel"));
+    document.querySelector("#importPlatform").addEventListener("change", (event) => {
+      const custom = event.target.value === "custom";
+      const input = document.querySelector("#importCustomPlatform");
+      document.querySelector("#importCustomPlatformField").hidden = !custom;
+      input.required = custom;
+      if (custom) input.focus();
+      renderImportPreview();
+    });
+    document.querySelector("#importCustomPlatform").addEventListener("input", renderImportPreview);
+    document.querySelector("#importFolderInput").addEventListener("change", (event) => {
+      importFolderScanned = true;
+      const files = [...event.target.files];
+      const folderName = files[0]?.webkitRelativePath.split("/")[0];
+      document.querySelector("#importFolderLabel").textContent =
+        folderName || (files.length ? `${files.length} ${files.length === 1 ? "file" : "files"} selected` : "Choose a folder");
+      importCandidates = files
+        .filter((file) => {
+          const extension = file.name.split(".").pop().toLowerCase();
+          return file.name.includes(".") && ROM_EXTENSIONS.has(extension);
+        })
+        .map((file) => ({
+          title: titleFromRomFilename(file.name),
+          path: file.webkitRelativePath || file.name,
+          selected: true
+        }));
+      renderImportPreview();
+    });
+    document.querySelector("#importList").addEventListener("change", (event) => {
+      const index = Number(event.target.dataset.importIndex);
+      if (!Number.isInteger(index) || !importCandidates[index]) return;
+      importCandidates[index].selected = event.target.checked;
+      updateImportButton();
+    });
+    document.querySelector("#selectImportGamesButton").addEventListener("click", () => {
+      for (const candidate of importCandidates) {
+        candidate.selected = !candidate.invalid && !candidate.libraryDuplicate && !candidate.scanDuplicate;
+      }
+      renderImportPreview();
+    });
+    document.querySelector("#clearImportGamesButton").addEventListener("click", () => {
+      for (const candidate of importCandidates) candidate.selected = false;
+      renderImportPreview();
+    });
+    document.querySelector("#confirmImportButton").addEventListener("click", importSelectedGames);
     document.querySelector("#settingsButton").addEventListener("click", openApiKeySettings);
     document.querySelector("#closeSettingsDialogButton").addEventListener("click", () => settingsDialog.close("cancel"));
     document.querySelector("#cancelSettingsDialogButton").addEventListener("click", () => settingsDialog.close("cancel"));
@@ -1028,6 +1348,7 @@
     document.querySelector("#platformFilter").addEventListener("change", renderGames);
     document.querySelector("#sortFilter").addEventListener("change", renderGames);
     document.querySelector("#exportCsvButton").addEventListener("click", exportGamesCsv);
+    setupImportPlatforms();
 
     api("/api/settings/accent-color").then((response) => {
       savedAccentColor = response.color;
