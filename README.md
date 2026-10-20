@@ -8,6 +8,8 @@ A self-hosted web app for tracking a personal game collection. Add and edit game
 - Click a game's title or cover to view its full details and edit it from that view.
 - Track platform, release year, status, description, and notes.
 - Sort the library by title or platform and filter by title, status, or platform.
+- Import game titles from a `.txt` file, choose a platform for the entire list, and review the titles before confirming the import.
+- Bulk import skips repeated titles on the same platform (ignoring case and surrounding whitespace), including repeats within the file. The preview marks duplicates; the server checks again when saving. The same title on different platforms is allowed, and existing duplicates are not removed.
 - Export the full game library to a spreadsheet-friendly CSV file.
 - Optionally search TheGamesDB for game details and cover art.
 - Upload a personal JPEG, PNG, or WebP cover (up to 12 MB).
@@ -37,11 +39,11 @@ A self-hosted web app for tracking a personal game collection. Add and edit game
 By default, Compose uses the `latest` image, which is updated from the `main` branch. To pin a release instead, set `GAME_LIBRARY_VERSION` to its image tag when pulling and starting the container:
 
 ```bash
-GAME_LIBRARY_VERSION=v1.3 docker compose pull
-GAME_LIBRARY_VERSION=v1.3 docker compose up -d
+GAME_LIBRARY_VERSION=v1.4 docker compose pull
+GAME_LIBRARY_VERSION=v1.4 docker compose up -d
 ```
 
-You can also set `GAME_LIBRARY_VERSION` in a local `.env` file so every Compose command uses the same version. To publish a new version, create and push a Git tag beginning with `v` (for example, `v1.3`). The Docker workflow publishes an image with that exact tag; it does not move the `latest` tag, which continues to track `main`.
+You can also set `GAME_LIBRARY_VERSION` in a local `.env` file so every Compose command uses the same version. To publish a new version, create and push a Git tag beginning with `v` (for example, `v1.4`). The Docker workflow publishes an image with that exact tag; it does not move the `latest` tag, which continues to track `main`.
 
 By default, Docker publishes the app on port 8080. To use a different port, set `GAME_LIBRARY_PORT` when starting the container:
 

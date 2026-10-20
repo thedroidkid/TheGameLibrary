@@ -453,6 +453,27 @@ class GameLibraryHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         route = urlsplit(self.path).path
+        if route == "/api/games/import":
+            payload = read_request_json(self)
+            if not isinstance(payload, dict) or not isinstance(payload.get("games"), list) or not payload["games"]:
+                raise APIError("Choose a text file containing at least one game title.")
+            requested_games = [validated_game(game) for game in payload["games"]]
+            with STORAGE_LOCK:
+                games = read_games()
+                seen = {(game["title"].strip().lower(), game["platform"].strip().lower()) for game in games}
+                imported_games = []
+                skipped_games = []
+                for game in requested_games:
+                    key = (game["title"].lower(), game["platform"].lower())
+                    if key in seen:
+                        skipped_games.append(game)
+                    else:
+                        seen.add(key)
+                        imported_games.append(game)
+                if imported_games:
+                    games.extend(imported_games)
+                    write_games(games)
+            return self.send_json(201, {"games": imported_games, "skipped": skipped_games})
         if route == "/api/covers/download":
             cover = download_cover(read_request_json(self))
             return self.send_json(201, {"cover": cover})

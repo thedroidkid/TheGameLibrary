@@ -501,6 +501,44 @@ try {
         }
         send_json(201, ['cover' => save_cover($coversDir, $data, $contentType)]);
     }
+    if ($method === 'POST' && $route === 'games/import') {
+        $payload = read_json_body();
+        $requestedGames = $payload['games'] ?? null;
+        if (!is_array($requestedGames) || !array_is_list($requestedGames) || $requestedGames === []) {
+            throw new ApiError('Choose a text file containing at least one game title.');
+        }
+        $validatedGames = [];
+        foreach ($requestedGames as $requestedGame) {
+            if (!is_array($requestedGame)) {
+                throw new ApiError('Each imported game must include a title and platform.');
+            }
+            $validatedGames[] = validate_game($requestedGame);
+        }
+        $result = with_games_lock($coversDir . '/.games.lock', function () use ($gamesFile, $validatedGames): array {
+            $games = read_games_file($gamesFile);
+            $seen = [];
+            foreach ($games as $game) {
+                $key = json_encode([normalized_title(trim($game['title'])), normalized_title(trim($game['platform']))]);
+                $seen[$key] = true;
+            }
+            $importedGames = [];
+            $skippedGames = [];
+            foreach ($validatedGames as $game) {
+                $key = json_encode([normalized_title($game['title']), normalized_title($game['platform'])]);
+                if (isset($seen[$key])) {
+                    $skippedGames[] = $game;
+                } else {
+                    $seen[$key] = true;
+                    $importedGames[] = $game;
+                }
+            }
+            if ($importedGames !== []) {
+                write_games_file($gamesFile, array_merge($games, $importedGames));
+            }
+            return ['games' => $importedGames, 'skipped' => $skippedGames];
+        });
+        send_json(201, $result);
+    }
     if ($route === 'games' && $method === 'POST') {
         $game = validate_game(read_json_body());
         with_games_lock($coversDir . '/.games.lock', function () use ($gamesFile, $game): void {

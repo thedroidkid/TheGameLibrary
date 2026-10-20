@@ -80,7 +80,7 @@
     dialog { width: min(660px, calc(100% - 28px)); max-height: min(90vh, 900px); overflow: hidden; border: 1px solid var(--line); border-radius: 16px; padding: 0; background: var(--panel); color: var(--text); box-shadow: 0 24px 90px #0009; }
     dialog[open] { display: flex; flex-direction: column; }
     dialog::backdrop { background: #07090dbb; backdrop-filter: blur(4px); }
-    #gameForm { display: flex; min-height: 0; flex-direction: column; }
+    #gameForm, #bulkImportForm { display: flex; min-height: 0; flex-direction: column; }
     .settings-form { display: flex; min-height: 0; flex-direction: column; }
     .dialog-head, .dialog-foot { flex: 0 0 auto; }
     .dialog-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 20px 24px; }
@@ -101,6 +101,13 @@
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .form-field { display: grid; gap: 7px; }
     .form-field label { color: #c2c9d5; font-size: 12px; font-weight: 700; }
+    .bulk-import-file { margin-top: 18px; }
+    .bulk-import-preview { margin-top: 18px; }
+    .bulk-import-list { max-height: 220px; overflow-y: auto; margin: 10px 0 0; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px 12px 38px; background: var(--bg); font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+    .bulk-import-skipped { color: var(--muted); }
+    #bulkImportFile { height: 46px; padding: 5px 10px; line-height: 34px; }
+    #bulkImportFile::file-selector-button { height: 34px; margin: 0 10px 0 0; border: 0; border-radius: 6px; padding: 0 10px; background: var(--panel-raised); color: var(--text); font: inherit; vertical-align: top; cursor: pointer; }
+    #bulkImportFile::file-selector-button:hover { background: #2b3546; }
     .accent-picker-row { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 10px; }
     .accent-picker { width: 64px; height: 46px; padding: 5px; cursor: pointer; }
     .accent-actions { display: flex; gap: 9px; }
@@ -190,6 +197,7 @@
       </div>
       <div class="intro-actions">
         <button class="button" id="settingsButton" type="button">Settings</button>
+        <button class="button" id="importGamesButton" type="button">Import games</button>
         <button class="button" id="exportCsvButton" type="button">Export CSV</button>
         <button class="button button-primary" id="addGameButton" type="button"><span aria-hidden="true">＋</span> Add a game</button>
       </div>
@@ -338,6 +346,38 @@
       <p class="dialog-error" id="dialogError" role="alert" hidden></p>
     </form>
   </dialog>
+  <dialog id="bulkImportDialog" aria-labelledby="bulkImportTitle">
+    <form id="bulkImportForm">
+      <div class="dialog-head">
+        <h2 id="bulkImportTitle">Import games from a text file</h2>
+        <button class="icon-button" type="button" id="closeBulkImportButton" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-field">
+          <label for="bulkImportPlatform">Platform for all games</label>
+          <select class="field" id="bulkImportPlatform" required></select>
+          <input class="field" id="bulkImportCustomPlatform" maxlength="80" placeholder="Enter platform name" aria-label="Custom import platform" hidden>
+        </div>
+        <div class="form-field bulk-import-file">
+          <label for="bulkImportFile">Game list (.txt)</label>
+          <input class="field" id="bulkImportFile" type="file" accept=".txt,text/plain" required>
+          <p class="help-text">Use one game title per line. Blank lines are ignored. Imported games start in your Backlog.</p>
+        </div>
+        <p class="help-text" id="bulkImportStatus" role="status" aria-live="polite"></p>
+        <section class="bulk-import-preview" id="bulkImportPreview" aria-labelledby="bulkImportPreviewTitle" hidden>
+          <h3 id="bulkImportPreviewTitle">Review games to import</h3>
+          <p class="help-text">Confirm these titles and the selected platform before importing. Duplicate titles on the same platform are skipped (ignoring case).</p>
+          <ol class="bulk-import-list" id="bulkImportList"></ol>
+        </section>
+      </div>
+      <div class="dialog-foot">
+        <div class="dialog-foot-right">
+          <button class="button" type="button" id="cancelBulkImportButton">Cancel</button>
+          <button class="button button-primary" id="submitBulkImportButton" type="submit" disabled>Confirm import</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
   <dialog id="detailsDialog" aria-labelledby="detailsTitle">
     <div class="dialog-head">
       <h2 id="detailsTitle"></h2>
@@ -394,7 +434,7 @@
           <input class="field" id="theGamesDbKey" name="key" type="password" maxlength="512" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="Paste your API key" required>
         </div>
         <p class="help-text">The key is stored on this server and is not sent back to your browser. It is shared by everyone using this library. Anyone who can access this app can replace or remove it.</p>
-        <p class="help-text app-version">Version v1.3</p>
+        <p class="help-text app-version">Version v1.4</p>
       </div>
       <div class="dialog-foot">
         <button class="button" id="removeApiKeyButton" type="button" hidden>Remove key</button>
@@ -411,9 +451,11 @@
   <script>
     const gameGrid = document.querySelector("#gameGrid");
     const gameDialog = document.querySelector("#gameDialog");
+    const bulkImportDialog = document.querySelector("#bulkImportDialog");
     const detailsDialog = document.querySelector("#detailsDialog");
     const settingsDialog = document.querySelector("#settingsDialog");
     const gameForm = document.querySelector("#gameForm");
+    const bulkImportForm = document.querySelector("#bulkImportForm");
     const settingsForm = document.querySelector("#settingsForm");
     const toast = document.querySelector("#toast");
     let games = [];
@@ -421,6 +463,7 @@
     let cover = "";
     let toastTimeout;
     let savedAccentColor = "#a9ef57";
+    let bulkImportTitles = [];
 
     async function api(path, options = {}) {
       const isFormData = options.body instanceof FormData;
@@ -695,6 +738,66 @@
       }
     }
 
+    function prepareBulkImportPlatforms() {
+      const platformSelect = document.querySelector("#bulkImportPlatform");
+      platformSelect.add(new Option("Select a platform", "", true, true));
+      platformSelect.options[0].disabled = true;
+      for (const child of document.querySelector("#gamePlatform").children) {
+        platformSelect.append(child.cloneNode(true));
+      }
+      for (const option of platformSelect.options) {
+        option.defaultSelected = option.value === "";
+      }
+      platformSelect.value = "";
+    }
+    prepareBulkImportPlatforms();
+
+    function renderBulkImportPreview() {
+      const select = document.querySelector("#bulkImportPlatform");
+      const platform = (select.value === "custom"
+        ? document.querySelector("#bulkImportCustomPlatform").value
+        : select.value).trim();
+      const keyFor = (title, platform) => JSON.stringify([title.trim().toLowerCase(), platform.trim().toLowerCase()]);
+      const seen = new Set(games.map((game) => keyFor(game.title, game.platform)));
+      const list = document.querySelector("#bulkImportList");
+      list.replaceChildren();
+      let skipped = 0;
+      for (const title of bulkImportTitles) {
+        const key = keyFor(title, platform);
+        const duplicate = seen.has(key);
+        seen.add(key);
+        const item = document.createElement("li");
+        item.textContent = duplicate ? `${title} — Duplicate, will be skipped` : title;
+        if (duplicate) {
+          skipped++;
+          item.className = "bulk-import-skipped";
+        }
+        list.append(item);
+      }
+      document.querySelector("#bulkImportPreview").hidden = !bulkImportTitles.length;
+      const status = document.querySelector("#bulkImportStatus");
+      status.classList.remove("error-text");
+      status.textContent = bulkImportTitles.length
+        ? `${bulkImportTitles.length - skipped} to import · ${skipped} duplicate${skipped === 1 ? "" : "s"} skipped.${platform ? "" : " Select a platform to check your library."}`
+        : "";
+      document.querySelector("#submitBulkImportButton").disabled = !platform || bulkImportTitles.length === skipped;
+    }
+
+    function resetBulkImport() {
+      bulkImportForm.reset();
+      document.querySelector("#bulkImportPlatform").value = "";
+      bulkImportTitles = [];
+      document.querySelector("#bulkImportList").replaceChildren();
+      document.querySelector("#bulkImportPreview").hidden = true;
+      const status = document.querySelector("#bulkImportStatus");
+      status.textContent = "";
+      status.classList.remove("error-text");
+      const custom = document.querySelector("#bulkImportCustomPlatform");
+      custom.hidden = true;
+      custom.required = false;
+      document.querySelector("#submitBulkImportButton").disabled = true;
+    }
+
     function openEditor(game = null, searchCovers = false) {
       editingId = game?.id ?? null;
       cover = game?.cover ?? "";
@@ -717,6 +820,11 @@
       updateCoverPreview();
       gameDialog.showModal();
       if (searchCovers) searchForCovers();
+    }
+
+    function openBulkImport() {
+      resetBulkImport();
+      bulkImportDialog.showModal();
     }
 
     async function loadGames() {
@@ -842,6 +950,103 @@
         errorMessage.hidden = false;
       } finally {
         saveButton.disabled = false;
+      }
+    });
+
+    document.querySelector("#importGamesButton").addEventListener("click", openBulkImport);
+    document.querySelector("#closeBulkImportButton").addEventListener("click", () => bulkImportDialog.close("cancel"));
+    document.querySelector("#cancelBulkImportButton").addEventListener("click", () => bulkImportDialog.close("cancel"));
+    document.querySelector("#bulkImportPlatform").addEventListener("change", (event) => {
+      const custom = document.querySelector("#bulkImportCustomPlatform");
+      custom.hidden = event.target.value !== "custom";
+      custom.required = !custom.hidden;
+      renderBulkImportPreview();
+      if (!custom.hidden) custom.focus();
+    });
+    document.querySelector("#bulkImportCustomPlatform").addEventListener("input", renderBulkImportPreview);
+    document.querySelector("#bulkImportFile").addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      const status = document.querySelector("#bulkImportStatus");
+      const submitButton = document.querySelector("#submitBulkImportButton");
+      bulkImportTitles = [];
+      document.querySelector("#bulkImportList").replaceChildren();
+      document.querySelector("#bulkImportPreview").hidden = true;
+      submitButton.disabled = true;
+      status.classList.remove("error-text");
+      if (!file) {
+        status.textContent = "";
+        return;
+      }
+      if (!file.name.toLowerCase().endsWith(".txt")) {
+        status.textContent = "Choose a .txt file.";
+        status.classList.add("error-text");
+        event.target.value = "";
+        return;
+      }
+      try {
+        const text = (await file.text()).replace(/^\uFEFF/, "");
+        if (event.target.files[0] !== file || !bulkImportDialog.open) return;
+        const lines = text.split(/\r\n?|\n/);
+        const invalidLine = lines.findIndex((line) => line.trim().length > 160);
+        if (invalidLine !== -1) {
+          status.textContent = `Line ${invalidLine + 1} is longer than the 160-character game title limit.`;
+          status.classList.add("error-text");
+          event.target.value = "";
+          return;
+        }
+        bulkImportTitles = lines.map((line) => line.trim()).filter(Boolean);
+        if (!bulkImportTitles.length) {
+          status.textContent = "The selected file does not contain any game titles.";
+          status.classList.add("error-text");
+          event.target.value = "";
+          return;
+        }
+        renderBulkImportPreview();
+      } catch (error) {
+        status.textContent = `Could not read the selected file: ${error.message}`;
+        status.classList.add("error-text");
+        event.target.value = "";
+      }
+    });
+    bulkImportForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const platformSelect = document.querySelector("#bulkImportPlatform");
+      const platform = platformSelect.value === "custom"
+        ? document.querySelector("#bulkImportCustomPlatform").value.trim()
+        : platformSelect.value;
+      const submitButton = document.querySelector("#submitBulkImportButton");
+      const status = document.querySelector("#bulkImportStatus");
+      if (!bulkImportTitles.length || !platform) {
+        status.textContent = "Choose a platform and a text file containing game titles.";
+        status.classList.add("error-text");
+        return;
+      }
+      if (platform.length > 80) {
+        status.textContent = "Platform must be 80 characters or fewer.";
+        status.classList.add("error-text");
+        return;
+      }
+      submitButton.disabled = true;
+      status.classList.remove("error-text");
+      status.textContent = `Importing ${bulkImportTitles.length} games…`;
+      try {
+        const response = await api("/api/games/import", {
+          method: "POST",
+          body: JSON.stringify({
+            games: bulkImportTitles.map((title) => ({ title, platform, status: "Backlog" }))
+          })
+        });
+        bulkImportDialog.close();
+        try {
+          await loadGames();
+          showToast(`Added ${response.games.length} games to your library. Skipped ${response.skipped.length} duplicate${response.skipped.length === 1 ? "" : "s"}.`);
+        } catch (error) {
+          showToast(`Games imported, but the library could not refresh: ${error.message}`);
+        }
+      } catch (error) {
+        status.textContent = error.message;
+        status.classList.add("error-text");
+        submitButton.disabled = false;
       }
     });
 
