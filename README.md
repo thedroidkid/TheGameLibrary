@@ -39,11 +39,11 @@ A self-hosted web app for tracking a personal game collection. Add and edit game
 By default, Compose uses the `latest` image, which is updated from the `main` branch. To pin a release instead, set `GAME_LIBRARY_VERSION` to its image tag when pulling and starting the container:
 
 ```bash
-GAME_LIBRARY_VERSION=v1.4 docker compose pull
-GAME_LIBRARY_VERSION=v1.4 docker compose up -d
+GAME_LIBRARY_VERSION=v1.5 docker compose pull
+GAME_LIBRARY_VERSION=v1.5 docker compose up -d
 ```
 
-You can also set `GAME_LIBRARY_VERSION` in a local `.env` file so every Compose command uses the same version. To publish a new version, create and push a Git tag beginning with `v` (for example, `v1.4`). The Docker workflow publishes an image with that exact tag; it does not move the `latest` tag, which continues to track `main`.
+You can also set `GAME_LIBRARY_VERSION` in a local `.env` file so every Compose command uses the same version. To publish a new version, create and push a Git tag beginning with `v` (for example, `v1.5`). The Docker workflow publishes an image with that exact tag; it does not move the `latest` tag, which continues to track `main`.
 
 By default, Docker publishes the app on port 8080. To use a different port, set `GAME_LIBRARY_PORT` when starting the container:
 
