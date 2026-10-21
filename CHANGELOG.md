@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.6 - 2026-10-21
+
+- Added in-app Settings support to the Python server for the TheGamesDB API key and shared accent color, stored in `.thegamesdb-key` and `accent-color`.
+- Improved the game grid so cards align and covers of different shapes (such as N64 and Game Boy boxes) display at their natural proportions.
+- Allowed the library header buttons to wrap on narrow screens.
+- Fixed "Find cover" failing with a `searchForCovers is not defined` error.
+- Updated the app version in Settings and deployment examples to **v1.6**.
+
 ## v1.5 - 2026-10-20
 
 - Replaced browser-based ROM folder import with `.txt` file import: one game title per line, with a selected platform applied to the entire list.

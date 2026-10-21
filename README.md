@@ -39,11 +39,11 @@ A self-hosted web app for tracking a personal game collection. Add and edit game
 By default, Compose uses the `latest` image, which is updated from the `main` branch. To pin a release instead, set `GAME_LIBRARY_VERSION` to its image tag when pulling and starting the container:
 
 ```bash
-GAME_LIBRARY_VERSION=v1.5 docker compose pull
-GAME_LIBRARY_VERSION=v1.5 docker compose up -d
+GAME_LIBRARY_VERSION=v1.6 docker compose pull
+GAME_LIBRARY_VERSION=v1.6 docker compose up -d
 ```
 
-You can also set `GAME_LIBRARY_VERSION` in a local `.env` file so every Compose command uses the same version. To publish a new version, create and push a Git tag beginning with `v` (for example, `v1.5`). The Docker workflow publishes an image with that exact tag; it does not move the `latest` tag, which continues to track `main`.
+You can also set `GAME_LIBRARY_VERSION` in a local `.env` file so every Compose command uses the same version. To publish a new version, create and push a Git tag beginning with `v` (for example, `v1.6`). The Docker workflow publishes an image with that exact tag; it does not move the `latest` tag, which continues to track `main`.
 
 By default, Docker publishes the app on port 8080. To use a different port, set `GAME_LIBRARY_PORT` when starting the container:
 
@@ -105,6 +105,8 @@ The project also includes a PHP backend for Apache hosting and an optional Pytho
 
 - For Apache, use PHP 8.1+ with `mod_rewrite`; see the Apache section below.
 - For the Python server, use Python 3.10+ and run `python3 server.py`. It binds to `127.0.0.1:8000` by default. Set `HOST=0.0.0.0` to allow other devices on the local network to connect.
+
+The Python server supports the in-app Settings dialog. It saves the API key in `.thegamesdb-key` and the accent color in `accent-color` beside the app files; include these files in backups and keep the API key private.
 
 Do not expose either non-Docker server publicly without adding authentication.
 

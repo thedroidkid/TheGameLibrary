@@ -1,5 +1,6 @@
 /config/thegamesdb-key
 /.thegamesdb-key
+/accent-color
 /covers/*
 !/covers/.gitkeep
 /__pycache__/

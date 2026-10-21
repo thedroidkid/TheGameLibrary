@@ -19,6 +19,8 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 ROOT = Path(__file__).resolve().parent
 DATA_FILE = ROOT / "games.json"
 KEY_FILE = ROOT / ".thegamesdb-key"
+COLOR_FILE = ROOT / "accent-color"
+DEFAULT_ACCENT_COLOR = "#a9ef57"
 COVER_DIR = ROOT / "covers"
 HTML_FILE = ROOT / "TheGameLibrary.html"
 HOST = os.environ.get("HOST", "127.0.0.1")
@@ -89,6 +91,27 @@ def write_games(games: list[dict]) -> None:
         os.replace(temporary_file, DATA_FILE)
     finally:
         temporary_file.unlink(missing_ok=True)
+
+
+def write_private_setting(path: Path, value: str) -> None:
+    temporary_file = path.with_name(f"{path.name}.{uuid.uuid4()}.tmp")
+    try:
+        with temporary_file.open("x", encoding="utf-8") as setting_file:
+            os.chmod(temporary_file, 0o600)
+            setting_file.write(value + "\n")
+        os.replace(temporary_file, path)
+    finally:
+        temporary_file.unlink(missing_ok=True)
+
+
+def read_accent_color() -> str:
+    try:
+        color = COLOR_FILE.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return DEFAULT_ACCENT_COLOR
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+        raise APIError("The saved accent color setting is invalid.", 500)
+    return color.lower()
 
 
 def validated_game(payload, existing: dict | None = None) -> dict[str, str]:
@@ -420,6 +443,13 @@ class GameLibraryHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         url = urlsplit(self.path)
+        if url.path == "/api/settings/accent-color":
+            with STORAGE_LOCK:
+                return self.send_json(200, {"color": read_accent_color()})
+        if url.path == "/api/settings/thegamesdb-key":
+            with STORAGE_LOCK:
+                configured = KEY_FILE.is_file() and bool(KEY_FILE.read_text(encoding="utf-8").strip())
+            return self.send_json(200, {"configured": configured})
         if url.path == "/api/games":
             with STORAGE_LOCK:
                 return self.send_json(200, {"games": read_games()})
@@ -491,7 +521,27 @@ class GameLibraryHandler(BaseHTTPRequestHandler):
         self.send_json(404, {"error": "API route not found."})
 
     def do_PUT(self) -> None:
-        match = re.fullmatch(r"/api/games/([0-9a-f-]{36})", urlsplit(self.path).path)
+        route = urlsplit(self.path).path
+        if route == "/api/settings/accent-color":
+            payload = read_request_json(self)
+            color = payload.get("color") if isinstance(payload, dict) else None
+            if not isinstance(color, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+                raise APIError("Enter a HEX color in #RRGGBB format.")
+            with STORAGE_LOCK:
+                write_private_setting(COLOR_FILE, color.lower())
+            return self.send_json(200, {"color": color.lower()})
+        if route == "/api/settings/thegamesdb-key":
+            payload = read_request_json(self)
+            api_key = payload.get("key") if isinstance(payload, dict) else None
+            if not isinstance(api_key, str):
+                raise APIError("Enter a valid TheGamesDB API key.")
+            api_key = api_key.strip()
+            if not api_key or len(api_key) > 512 or re.search(r"[\x00-\x1f\x7f]", api_key):
+                raise APIError("Enter a TheGamesDB API key of 1 to 512 characters.")
+            with STORAGE_LOCK:
+                write_private_setting(KEY_FILE, api_key)
+            return self.send_json(200, {"configured": True})
+        match = re.fullmatch(r"/api/games/([0-9a-f-]{36})", route)
         if not match:
             return self.send_json(404, {"error": "API route not found."})
         payload = read_request_json(self)
@@ -506,7 +556,16 @@ class GameLibraryHandler(BaseHTTPRequestHandler):
         self.send_json(200, {"game": game})
 
     def do_DELETE(self) -> None:
-        match = re.fullmatch(r"/api/games/([0-9a-f-]{36})", urlsplit(self.path).path)
+        route = urlsplit(self.path).path
+        if route == "/api/settings/accent-color":
+            with STORAGE_LOCK:
+                COLOR_FILE.unlink(missing_ok=True)
+            return self.send_json(200, {"color": DEFAULT_ACCENT_COLOR})
+        if route == "/api/settings/thegamesdb-key":
+            with STORAGE_LOCK:
+                KEY_FILE.unlink(missing_ok=True)
+            return self.send_json(200, {"configured": False})
+        match = re.fullmatch(r"/api/games/([0-9a-f-]{36})", route)
         if not match:
             return self.send_json(404, {"error": "API route not found."})
         with STORAGE_LOCK:
