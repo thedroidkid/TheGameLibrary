@@ -34,7 +34,10 @@ COVER_PATTERN = re.compile(r"^/covers/[0-9a-f-]{36}\.(?:jpg|png|webp)$")
 IMAGE_PATH_PATTERN = re.compile(
     r"^/images/(?:original|medium|large|thumb)/boxart/front/[a-zA-Z0-9._-]+$"
 )
+MAX_GENRES = 10
+MAX_GENRE_LENGTH = 40
 STORAGE_LOCK = threading.RLock()
+GENRE_NAMES: dict[str, str] = {}
 
 INITIAL_TITLES: list[str] = []
 
@@ -58,6 +61,7 @@ def new_game(title: str) -> dict[str, str]:
         "platform": "PlayStation 5",
         "year": "",
         "status": "Backlog",
+        "genres": [],
         "notes": "",
         "cover": "",
     }
@@ -114,15 +118,35 @@ def read_accent_color() -> str:
     return color.lower()
 
 
-def validated_game(payload, existing: dict | None = None) -> dict[str, str]:
+def validated_genres(value) -> list[str]:
+    if isinstance(value, str):
+        value = re.split(r"[|,]", value)
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise APIError("Genres must be a list of names.")
+    genres = []
+    seen = set()
+    for item in value:
+        name = " ".join(item.split())
+        if not name or name.casefold() in seen:
+            continue
+        if len(name) > MAX_GENRE_LENGTH:
+            raise APIError(f"Each genre must be {MAX_GENRE_LENGTH} characters or fewer.")
+        seen.add(name.casefold())
+        genres.append(name)
+    if len(genres) > MAX_GENRES:
+        raise APIError(f"Enter up to {MAX_GENRES} genres.")
+    return genres
+
+
+def validated_game(payload, existing: dict | None = None) -> dict:
     if not isinstance(payload, dict):
         raise APIError("A game object is required.")
     title = payload.get("title")
     if not isinstance(title, str) or not title.strip() or len(title.strip()) > 160:
         raise APIError("Enter a game title (up to 160 characters).")
     platform = payload.get("platform", "")
-    if not isinstance(platform, str) or len(platform.strip()) > 80:
-        raise APIError("Platform must be 80 characters or fewer.")
+    if not isinstance(platform, str) or not platform.strip() or len(platform.strip()) > 80:
+        raise APIError("Choose a platform (up to 80 characters).")
     raw_year = payload.get("year", "")
     year = "" if raw_year in ("", None) else str(raw_year)
     if year and (not re.fullmatch(r"\d{4}", year) or not 1950 <= int(year) <= 2100):
@@ -136,6 +160,7 @@ def validated_game(payload, existing: dict | None = None) -> dict[str, str]:
     description = payload.get("description", (existing or {}).get("description", ""))
     if not isinstance(description, str) or len(description.strip()) > 5000:
         raise APIError("Description must be 5000 characters or fewer.")
+    genres = validated_genres(payload.get("genres", (existing or {}).get("genres", [])))
     cover = payload.get("cover", "")
     if not isinstance(cover, str) or (cover and not COVER_PATTERN.fullmatch(cover)):
         raise APIError("Cover must be a downloaded local image.")
@@ -145,6 +170,7 @@ def validated_game(payload, existing: dict | None = None) -> dict[str, str]:
         "platform": platform.strip(),
         "year": year,
         "status": status,
+        "genres": genres,
         "notes": notes.strip(),
         "description": description.strip(),
         "cover": cover,
@@ -274,6 +300,22 @@ def read_cover_upload(request: BaseHTTPRequestHandler) -> tuple[bytes, str]:
     raise APIError("Choose an image file to upload.")
 
 
+def fetch_genre_names(api_key: str) -> dict[str, str]:
+    if GENRE_NAMES:
+        return GENRE_NAMES
+    url = f"https://api.thegamesdb.net/v1/Genres?{urlencode({'apikey': api_key})}"
+    try:
+        with urlopen(Request(url, headers={"User-Agent": "TheGameLibrary/1.0"}), timeout=15) as response:
+            payload = json.loads(response.read(1024 * 1024))
+        genres = ((payload.get("data") or {}).get("genres")) or {}
+        GENRE_NAMES.update(
+            {str(key): item["name"] for key, item in genres.items() if isinstance(item, dict) and isinstance(item.get("name"), str)}
+        )
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, AttributeError):
+        pass
+    return GENRE_NAMES
+
+
 def search_thegamesdb(query: str) -> list[dict]:
     try:
         api_key = KEY_FILE.read_text(encoding="utf-8").strip()
@@ -288,7 +330,7 @@ def search_thegamesdb(query: str) -> list[dict]:
             503,
         )
     query_string = urlencode(
-        {"apikey": api_key, "name": query, "include": "boxart,platform", "fields": "overview"}
+        {"apikey": api_key, "name": query, "include": "boxart,platform", "fields": "overview,genres"}
     )
     url = f"https://api.thegamesdb.net/v1.1/Games/ByGameName?{query_string}"
     try:
@@ -308,8 +350,10 @@ def search_thegamesdb(query: str) -> list[dict]:
     platforms = (payload.get("include") or {}).get("platform", {}).get("data", {})
     boxart = (payload.get("include") or {}).get("boxart", {})
     base_urls = boxart.get("base_url") or {}
+    games_found = (game_data.get("games") or [])[:20]
+    genre_names = fetch_genre_names(api_key) if any(game.get("genres") for game in games_found) else {}
     results = []
-    for game in (game_data.get("games") or [])[:20]:
+    for game in games_found:
         images = (boxart.get("data") or {}).get(str(game.get("id")), [])
         image = next(
             (
@@ -339,6 +383,11 @@ def search_thegamesdb(query: str) -> list[dict]:
                 "year": release_date[:4] if isinstance(release_date, str) else "",
                 "description": overview[:5000] if isinstance(overview, str) else "",
                 "descriptionSource": canonical_platform(raw_platform) if isinstance(overview, str) and overview.strip() and raw_platform else "",
+                "genres": [
+                    genre_names[str(genre_id)]
+                    for genre_id in (game.get("genres") or [])
+                    if str(genre_id) in genre_names
+                ][:MAX_GENRES],
                 "preview": (
                     f"/api/covers/preview?url={quote(f'{preview_base}{filename}', safe='')}"
                     if filename
@@ -352,7 +401,14 @@ def search_thegamesdb(query: str) -> list[dict]:
         for result in results
         if result["description"]
     }
+    genres_by_title = {
+        result["title"].casefold(): result["genres"]
+        for result in results
+        if result["genres"]
+    }
     for result in results:
+        if not result["genres"]:
+            result["genres"] = genres_by_title.get(result["title"].casefold(), [])
         if result["description"]:
             continue
         sibling = descriptions_by_title.get(result["title"].casefold())
@@ -504,6 +560,24 @@ class GameLibraryHandler(BaseHTTPRequestHandler):
                     games.extend(imported_games)
                     write_games(games)
             return self.send_json(201, {"games": imported_games, "skipped": skipped_games})
+        if route == "/api/games/bulk-delete":
+            payload = read_request_json(self)
+            ids = payload.get("ids") if isinstance(payload, dict) else None
+            if (
+                not isinstance(ids, list)
+                or not ids
+                or len(ids) > 10000
+                or not all(isinstance(game_id, str) and GAME_ID_PATTERN.fullmatch(game_id) for game_id in ids)
+            ):
+                raise APIError("Choose at least one game to delete.")
+            id_set = set(ids)
+            with STORAGE_LOCK:
+                games = read_games()
+                remaining = [game for game in games if game.get("id") not in id_set]
+                deleted = len(games) - len(remaining)
+                if deleted:
+                    write_games(remaining)
+            return self.send_json(200, {"deleted": deleted})
         if route == "/api/covers/download":
             cover = download_cover(read_request_json(self))
             return self.send_json(201, {"cover": cover})

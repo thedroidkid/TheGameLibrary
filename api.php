@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 const MAX_COVER_BYTES = 12582912;
 const DEFAULT_ACCENT_COLOR = '#a9ef57';
+const MAX_GENRES = 10;
+const MAX_GENRE_LENGTH = 40;
 
 $root = __DIR__;
 $dataDir = getenv('GAME_LIBRARY_DATA_DIR') ?: $root;
@@ -290,7 +292,33 @@ function fetch_cover(string $imageUrl): array
     return [$data, $extension];
 }
 
-function search_games(string $keyFile, string $query): array
+function fetch_genre_names(string $apiKey, string $cacheFile): array
+{
+    if (is_file($cacheFile)) {
+        $cached = json_decode((string)file_get_contents($cacheFile), true);
+        if (is_array($cached) && $cached !== []) {
+            return $cached;
+        }
+    }
+    try {
+        [$json] = remote_get('https://api.thegamesdb.net/v1/Genres?' . http_build_query(['apikey' => $apiKey]), 15);
+    } catch (ApiError) {
+        return [];
+    }
+    $genres = json_decode($json, true)['data']['genres'] ?? [];
+    $names = [];
+    foreach (is_array($genres) ? $genres : [] as $key => $genre) {
+        if (is_array($genre) && is_string($genre['name'] ?? null)) {
+            $names[(string)$key] = $genre['name'];
+        }
+    }
+    if ($names !== []) {
+        @file_put_contents($cacheFile, json_encode($names), LOCK_EX);
+    }
+    return $names;
+}
+
+function search_games(string $keyFile, string $query, string $genreCacheFile): array
 {
     if (!is_file($keyFile)) {
         throw new ApiError('Game search is unavailable because no TheGamesDB API key is configured. You can still enter the game details manually.', 503);
@@ -303,7 +331,7 @@ function search_games(string $keyFile, string $query): array
         'apikey' => $apiKey,
         'name' => $query,
         'include' => 'boxart,platform',
-        'fields' => 'overview',
+        'fields' => 'overview,genres',
     ]);
     try {
         [$json] = remote_get($url, 15);
@@ -321,8 +349,16 @@ function search_games(string $keyFile, string $query): array
     $platforms = $payload['include']['platform']['data'] ?? [];
     $boxart = $payload['include']['boxart'] ?? [];
     $baseUrls = $boxart['base_url'] ?? [];
+    $gamesFound = array_slice(is_array($data) ? $data : [], 0, 20);
+    $genreNames = [];
+    foreach ($gamesFound as $game) {
+        if (!empty($game['genres'])) {
+            $genreNames = fetch_genre_names($apiKey, $genreCacheFile);
+            break;
+        }
+    }
     $results = [];
-    foreach (array_slice(is_array($data) ? $data : [], 0, 20) as $game) {
+    foreach ($gamesFound as $game) {
         $images = $boxart['data'][(string)($game['id'] ?? '')] ?? [];
         $filename = '';
         foreach (is_array($images) ? $images : [] as $image) {
@@ -338,6 +374,12 @@ function search_games(string $keyFile, string $query): array
         $rawPlatform = $platforms[(string)($game['platform'] ?? '')]['name'] ?? '';
         $overview = (string)($game['overview'] ?? '');
         $releaseDate = (string)($game['release_date'] ?? '');
+        $genres = [];
+        foreach (is_array($game['genres'] ?? null) ? $game['genres'] : [] as $genreId) {
+            if (isset($genreNames[(string)$genreId])) {
+                $genres[] = $genreNames[(string)$genreId];
+            }
+        }
         $results[] = [
             'id' => $game['id'] ?? null,
             'title' => $game['game_title'] ?? 'Untitled game',
@@ -345,17 +387,25 @@ function search_games(string $keyFile, string $query): array
             'year' => preg_match('/^\d{4}/', $releaseDate, $year) ? $year[0] : '',
             'description' => substr($overview, 0, 5000),
             'descriptionSource' => $overview !== '' && $rawPlatform !== '' ? canonical_platform((string)$rawPlatform) : '',
+            'genres' => array_slice($genres, 0, MAX_GENRES),
             'preview' => $filename !== '' ? '/api/covers/preview?url=' . rawurlencode($previewBase . $filename) : '',
             'imageUrl' => $filename !== '' ? $originalBase . $filename : '',
         ];
     }
     $descriptions = [];
+    $genresByTitle = [];
     foreach ($results as $result) {
         if ($result['description'] !== '') {
             $descriptions[normalized_title($result['title'])] = $result;
         }
+        if ($result['genres'] !== []) {
+            $genresByTitle[normalized_title($result['title'])] = $result['genres'];
+        }
     }
     foreach ($results as &$result) {
+        if ($result['genres'] === []) {
+            $result['genres'] = $genresByTitle[normalized_title($result['title'])] ?? [];
+        }
         if ($result['description'] === '') {
             $sibling = $descriptions[normalized_title($result['title'])] ?? null;
             if ($sibling !== null) {
@@ -368,6 +418,37 @@ function search_games(string $keyFile, string $query): array
     return $results;
 }
 
+function validate_genres(mixed $value): array
+{
+    if (is_string($value)) {
+        $value = preg_split('/[|,]/', $value);
+    }
+    if (!is_array($value) || !array_is_list($value)) {
+        throw new ApiError('Genres must be a list of names.');
+    }
+    $genres = [];
+    $seen = [];
+    foreach ($value as $item) {
+        if (!is_string($item)) {
+            throw new ApiError('Genres must be a list of names.');
+        }
+        $name = trim((string)preg_replace('/\s+/u', ' ', $item));
+        $key = normalized_title($name);
+        if ($name === '' || isset($seen[$key])) {
+            continue;
+        }
+        if (mb_strlen($name, 'UTF-8') > MAX_GENRE_LENGTH) {
+            throw new ApiError('Each genre must be ' . MAX_GENRE_LENGTH . ' characters or fewer.');
+        }
+        $seen[$key] = true;
+        $genres[] = $name;
+    }
+    if (count($genres) > MAX_GENRES) {
+        throw new ApiError('Enter up to ' . MAX_GENRES . ' genres.');
+    }
+    return $genres;
+}
+
 function validate_game(array $payload, ?array $existing = null): array
 {
     $title = $payload['title'] ?? null;
@@ -375,8 +456,8 @@ function validate_game(array $payload, ?array $existing = null): array
         throw new ApiError('Enter a game title (up to 160 characters).');
     }
     $platform = $payload['platform'] ?? '';
-    if (!is_string($platform) || strlen(trim($platform)) > 80) {
-        throw new ApiError('Platform must be 80 characters or fewer.');
+    if (!is_string($platform) || trim($platform) === '' || strlen(trim($platform)) > 80) {
+        throw new ApiError('Choose a platform (up to 80 characters).');
     }
     $year = (string)($payload['year'] ?? '');
     if ($year !== '' && (!preg_match('/^\d{4}$/', $year) || (int)$year < 1950 || (int)$year > 2100)) {
@@ -394,6 +475,7 @@ function validate_game(array $payload, ?array $existing = null): array
     if (!is_string($description) || strlen(trim($description)) > 5000) {
         throw new ApiError('Description must be 5000 characters or fewer.');
     }
+    $genres = validate_genres($payload['genres'] ?? ($existing['genres'] ?? []));
     $cover = $payload['cover'] ?? '';
     if (!is_string($cover) || ($cover !== '' && !preg_match('~^/covers/[0-9a-f-]{36}\.(?:jpg|png|webp)$~', $cover))) {
         throw new ApiError('Cover must be a downloaded local image.');
@@ -404,6 +486,7 @@ function validate_game(array $payload, ?array $existing = null): array
         'platform' => trim($platform),
         'year' => $year,
         'status' => $status,
+        'genres' => $genres,
         'notes' => trim($notes),
         'description' => trim($description),
         'cover' => $cover,
@@ -471,7 +554,7 @@ try {
         if ($query === '' || strlen($query) > 120) {
             throw new ApiError('Enter a search title up to 120 characters long.');
         }
-        send_json(200, ['results' => search_games($keyFile, $query)]);
+        send_json(200, ['results' => search_games($keyFile, $query, $dataDir . '/genres-cache.json')]);
     }
     if ($method === 'GET' && $route === 'covers/preview') {
         [$data, $extension] = fetch_cover((string)($_GET['url'] ?? ''));
@@ -538,6 +621,28 @@ try {
             return ['games' => $importedGames, 'skipped' => $skippedGames];
         });
         send_json(201, $result);
+    }
+    if ($method === 'POST' && $route === 'games/bulk-delete') {
+        $ids = read_json_body()['ids'] ?? null;
+        if (!is_array($ids) || !array_is_list($ids) || $ids === [] || count($ids) > 10000) {
+            throw new ApiError('Choose at least one game to delete.');
+        }
+        foreach ($ids as $id) {
+            if (!is_string($id) || !preg_match('~^[0-9a-f-]{36}$~', $id)) {
+                throw new ApiError('Choose at least one game to delete.');
+            }
+        }
+        $idSet = array_flip($ids);
+        $deleted = with_games_lock($coversDir . '/.games.lock', function () use ($gamesFile, $idSet): int {
+            $games = read_games_file($gamesFile);
+            $remaining = array_values(array_filter($games, fn($game) => !isset($idSet[$game['id'] ?? ''])));
+            $count = count($games) - count($remaining);
+            if ($count > 0) {
+                write_games_file($gamesFile, $remaining);
+            }
+            return $count;
+        });
+        send_json(200, ['deleted' => $deleted]);
     }
     if ($route === 'games' && $method === 'POST') {
         $game = validate_game(read_json_body());

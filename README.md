@@ -4,10 +4,10 @@ A self-hosted web app for tracking a personal game collection. Add and edit game
 
 ## Features
 
-- Add, edit, and remove games from the web interface.
+- Add, edit, and remove games from the web interface, or select several games at once to delete them in bulk.
 - Click a game's title or cover to view its full details and edit it from that view.
-- Track platform, release year, status, description, and notes.
-- Sort the library by title or platform and filter by title, status, or platform.
+- Track platform, release year, status, genre(s), description, and notes. Genres can be entered manually (separated by `|` or commas) or filled in from TheGamesDB.
+- Sort the library by title or platform and filter by title, status, platform, or genre.
 - Import game titles from a `.txt` file, choose a platform for the entire list, and review the titles before confirming the import.
 - Bulk import skips repeated titles on the same platform (ignoring case and surrounding whitespace), including repeats within the file. The preview marks duplicates; the server checks again when saving. The same title on different platforms is allowed, and existing duplicates are not removed.
 - Export the full game library to a spreadsheet-friendly CSV file.

@@ -2,6 +2,11 @@
 
 ## v1.6 - 2026-10-21
 
+- Added multiple genres per game, entered manually (separated by `|` or commas) or filled in from TheGamesDB search results.
+- Genres appear as tags on game cards and in the details dialog, and are included in search and CSV export.
+- Added a genre filter to the main library page.
+- Added **Select games** mode to pick multiple games (or all games matching the current filters) and delete them in one step after confirmation.
+- The platform is now required when adding a game and starts on "Select a platform" instead of PlayStation 5.
 - Added in-app Settings support to the Python server for the TheGamesDB API key and shared accent color, stored in `.thegamesdb-key` and `accent-color`.
 - Improved the game grid so cards align and covers of different shapes (such as N64 and Game Boy boxes) display at their natural proportions.
 - Allowed the library header buttons to wrap on narrow screens.

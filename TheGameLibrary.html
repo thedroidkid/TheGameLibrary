@@ -56,7 +56,7 @@
     .summary { display: flex; justify-content: space-between; margin: 0 1px 16px; color: var(--muted); font-size: 13px; }
     .summary strong { color: var(--text); }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(202px, 1fr)); grid-auto-rows: 1fr; gap: 20px; }
-    .game-card { display: flex; min-width: 0; flex-direction: column; overflow: hidden; border: 1px solid #272e3b; border-radius: 13px; background: var(--panel); transition: border-color .16s, transform .16s; }
+    .game-card { position: relative; display: flex; min-width: 0; flex-direction: column; overflow: hidden; border: 1px solid #272e3b; border-radius: 13px; background: var(--panel); transition: border-color .16s, transform .16s; }
     .game-card:hover { transform: translateY(-3px); border-color: #536143; }
     .cover { position: relative; display: grid; width: 100%; flex: 0 0 auto; aspect-ratio: 2 / 2.6; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; overflow: hidden; padding: 8px; background: radial-gradient(ellipse at 50% 22%, #3b4a41 0, #26332f 28%, #1a2029 70%); color: #d7edb5; }
     .cover:has(img) { background: transparent; }
@@ -76,6 +76,18 @@
     .status[data-status="Completed"] { background: #222d37; color: #9ed7f6; }
     .status[data-status="Completed"]::before { background: #79c8f3; }
     .card-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .genre-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+    .genre-tag { border: 1px solid var(--line); border-radius: 20px; padding: 3px 8px; background: var(--panel-raised); color: #b6c0d2; font-size: 10px; font-weight: 700; }
+    .button-danger { border-color: var(--danger); background: transparent; color: var(--danger); }
+    .button-danger:hover { background: color-mix(in srgb, var(--danger) 16%, transparent); }
+    .button:disabled { opacity: .45; cursor: not-allowed; }
+    .selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 16px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: var(--panel); }
+    .selection-bar[hidden] { display: none; }
+    .selection-count { margin-right: auto; color: var(--muted); font-size: 13px; font-weight: 700; }
+    .select-check { position: absolute; top: 10px; left: 10px; z-index: 1; display: grid; width: 22px; height: 22px; place-items: center; border: 2px solid #8490a3; border-radius: 6px; background: #10131bcc; color: var(--accent-ink); font-size: 14px; font-weight: 900; pointer-events: none; }
+    .game-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .game-card.selected .select-check { border-color: var(--accent); background: var(--accent); }
+    .select-mode .card-actions { display: none; }
     .game-content .card-actions { margin-top: auto; padding-top: 14px; }
     .card-actions .button { flex: 1; min-width: 0; }
     .empty { grid-column: 1 / -1; border: 1px dashed var(--line); border-radius: 14px; padding: 65px 20px; color: var(--muted); text-align: center; }
@@ -203,6 +215,7 @@
         <button class="button" id="settingsButton" type="button">Settings</button>
         <button class="button" id="importGamesButton" type="button">Import games</button>
         <button class="button" id="exportCsvButton" type="button">Export CSV</button>
+        <button class="button" id="selectModeButton" type="button" aria-pressed="false">Select games</button>
         <button class="button button-primary" id="addGameButton" type="button"><span aria-hidden="true">＋</span> Add a game</button>
       </div>
     </section>
@@ -222,12 +235,22 @@
         <select class="field" id="platformFilter" aria-label="Filter by platform">
           <option value="">All platforms</option>
         </select>
+        <select class="field" id="genreFilter" aria-label="Filter by genre">
+          <option value="">All genres</option>
+        </select>
         <select class="field" id="sortFilter" aria-label="Sort games">
           <option value="title-asc" selected>Title: A to Z</option>
           <option value="library">Library order</option>
           <option value="platform-asc">Platform: A to Z</option>
           <option value="platform-desc">Platform: Z to A</option>
         </select>
+      </div>
+      <div class="selection-bar" id="selectionBar" hidden>
+        <span class="selection-count" id="selectionCount" role="status" aria-live="polite">0 selected</span>
+        <button class="button button-small" id="selectAllButton" type="button">Select all shown</button>
+        <button class="button button-small" id="clearSelectionButton" type="button">Clear</button>
+        <button class="button button-small button-danger" id="deleteSelectedButton" type="button" disabled>Delete selected</button>
+        <button class="button button-small" id="cancelSelectButton" type="button">Cancel</button>
       </div>
       <div class="summary"><span id="gameCount">Loading your games…</span><span>Cover art powered by TheGamesDB</span></div>
       <div class="grid" id="gameGrid" aria-live="polite"></div>
@@ -257,7 +280,8 @@
           </div>
           <div class="form-field">
             <label for="gamePlatform">Platform</label>
-            <select class="field" id="gamePlatform" name="platform">
+            <select class="field" id="gamePlatform" name="platform" required>
+              <option value="" selected disabled>Select a platform</option>
               <optgroup label="Nintendo consoles">
                 <option>Nintendo Entertainment System</option>
                 <option>Super Nintendo Entertainment System</option>
@@ -282,7 +306,7 @@
                 <option>PlayStation 2</option>
                 <option>PlayStation 3</option>
                 <option>PlayStation 4</option>
-                <option selected>PlayStation 5</option>
+                <option>PlayStation 5</option>
               </optgroup>
               <optgroup label="PlayStation handhelds">
                 <option>PlayStation Portable (PSP)</option>
@@ -316,6 +340,11 @@
               <option>Completed</option>
               <option>On Hold</option>
             </select>
+          </div>
+          <div class="form-field full">
+            <label for="gameGenres">Genre(s)</label>
+            <input class="field" id="gameGenres" name="genres" maxlength="500" placeholder="e.g. Adventure | Platform | Family" autocomplete="off">
+            <p class="help-text">Separate multiple genres with | or a comma.</p>
           </div>
           <div class="form-field full">
             <label for="gameDescription">Description</label>
@@ -394,6 +423,7 @@
           <div><dt>Platform</dt><dd id="detailsPlatform"></dd></div>
           <div><dt>Release year</dt><dd id="detailsYear"></dd></div>
           <div><dt>Status</dt><dd><span class="status" id="detailsStatus"></span></dd></div>
+          <div id="detailsGenresRow"><dt>Genre(s)</dt><dd><div class="genre-list" id="detailsGenres" style="margin-top:0"></div></dd></div>
         </dl>
       </div>
       <section class="details-section">
@@ -468,7 +498,10 @@
     let toastTimeout;
     let savedAccentColor = "#a9ef57";
     let bulkImportTitles = [];
-
+    let selectMode = false;
+    let visibleGames = [];
+    const selectedIds = new Set();
+    const cardsById = new Map();
     async function api(path, options = {}) {
       const isFormData = options.body instanceof FormData;
       const response = await fetch(path, {
@@ -568,15 +601,67 @@
       }
     }
 
+    function parseGenres(text) {
+      const seen = new Set();
+      return text.split(/[|,]/).map((item) => item.trim().replace(/\s+/g, " ")).filter((item) => {
+        const key = item.toLowerCase();
+        if (!item || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function renderGenreTags(container, genres) {
+      container.replaceChildren(...genres.map((genre) => {
+        const tag = document.createElement("span");
+        tag.className = "genre-tag";
+        tag.textContent = genre;
+        return tag;
+      }));
+    }
+
+    function updateSelectionUI() {
+      document.querySelector("#selectionBar").hidden = !selectMode;
+      document.querySelector("#selectionCount").textContent = `${selectedIds.size} selected`;
+      document.querySelector("#deleteSelectedButton").disabled = selectedIds.size === 0;
+      const toggle = document.querySelector("#selectModeButton");
+      toggle.textContent = selectMode ? "Cancel selection" : "Select games";
+      toggle.setAttribute("aria-pressed", String(selectMode));
+      gameGrid.classList.toggle("select-mode", selectMode);
+    }
+
+    function syncCardSelection(id) {
+      const card = cardsById.get(id);
+      if (!card) return;
+      const selected = selectedIds.has(id);
+      card.classList.toggle("selected", selected);
+      card.querySelector(".select-check").textContent = selected ? "✓" : "";
+      card.querySelector(".cover").setAttribute("aria-pressed", String(selected));
+    }
+
+    function toggleSelected(id) {
+      if (!selectedIds.delete(id)) selectedIds.add(id);
+      syncCardSelection(id);
+      updateSelectionUI();
+    }
+
+    function setSelectMode(enabled) {
+      selectMode = enabled;
+      selectedIds.clear();
+      renderGames();
+    }
+
     function renderGames() {
       const text = document.querySelector("#filterInput").value.trim().toLowerCase();
       const status = document.querySelector("#statusFilter").value;
       const platform = document.querySelector("#platformFilter").value;
+      const genre = document.querySelector("#genreFilter").value;
       const sort = document.querySelector("#sortFilter").value;
       const filtered = games.filter((game) =>
         (!status || game.status === status) &&
         (!platform || game.platform === platform) &&
-        (!text || `${game.title} ${game.platform} ${game.description || ""} ${game.notes}`.toLowerCase().includes(text))
+        (!genre || (game.genres || []).includes(genre)) &&
+        (!text || `${game.title} ${game.platform} ${(game.genres || []).join(" ")} ${game.description || ""} ${game.notes}`.toLowerCase().includes(text))
       );
       if (sort !== "library") {
         const direction = sort === "platform-desc" ? -1 : 1;
@@ -587,6 +672,13 @@
         );
       }
       gameGrid.replaceChildren();
+      cardsById.clear();
+      visibleGames = filtered;
+      const visibleIds = new Set(filtered.map((game) => game.id));
+      for (const id of [...selectedIds]) {
+        if (!visibleIds.has(id)) selectedIds.delete(id);
+      }
+      updateSelectionUI();
       document.querySelector("#gameCount").innerHTML =
         `<strong>${filtered.length}</strong> ${filtered.length === 1 ? "game" : "games"}${filtered.length !== games.length ? ` shown · ${games.length} total` : ""}`;
       if (filtered.length === 0) {
@@ -608,7 +700,7 @@
         art.type = "button";
         art.setAttribute("aria-label", `View details for ${game.title}`);
         art.setAttribute("aria-haspopup", "dialog");
-        art.addEventListener("click", () => openGameDetails(game));
+        art.addEventListener("click", () => selectMode ? toggleSelected(game.id) : openGameDetails(game));
         renderCover(art, game);
         const content = document.createElement("div");
         content.className = "game-content";
@@ -619,7 +711,7 @@
         titleButton.type = "button";
         titleButton.setAttribute("aria-haspopup", "dialog");
         titleButton.textContent = game.title;
-        titleButton.addEventListener("click", () => openGameDetails(game));
+        titleButton.addEventListener("click", () => selectMode ? toggleSelected(game.id) : openGameDetails(game));
         title.append(titleButton);
         const description = document.createElement("p");
         description.className = "game-description";
@@ -634,6 +726,9 @@
         badge.dataset.status = game.status;
         badge.textContent = game.status;
         meta.append(platform, badge);
+        const genreList = document.createElement("div");
+        genreList.className = "genre-list";
+        renderGenreTags(genreList, game.genres || []);
         const actions = document.createElement("div");
         actions.className = "card-actions";
         const findCover = document.createElement("button");
@@ -644,9 +739,19 @@
         actions.append(findCover);
         content.append(title);
         if (game.description) content.append(description);
-        content.append(meta, actions);
+        content.append(meta);
+        if (game.genres?.length) content.append(genreList);
+        content.append(actions);
         card.append(art, content);
+        if (selectMode) {
+          const check = document.createElement("span");
+          check.className = "select-check";
+          check.setAttribute("aria-hidden", "true");
+          card.append(check);
+        }
         gameGrid.append(card);
+        cardsById.set(game.id, card);
+        if (selectMode) syncCardSelection(game.id);
       }
     }
 
@@ -658,6 +763,9 @@
       const status = document.querySelector("#detailsStatus");
       status.dataset.status = game.status;
       status.textContent = game.status;
+      const genres = game.genres || [];
+      document.querySelector("#detailsGenresRow").hidden = !genres.length;
+      renderGenreTags(document.querySelector("#detailsGenres"), genres);
       document.querySelector("#detailsDescription").textContent = game.description || "No description has been added.";
       const notesSection = document.querySelector("#detailsNotesSection");
       notesSection.hidden = !game.notes;
@@ -676,6 +784,7 @@
         ["Platform", "platform"],
         ["Year", "year"],
         ["Status", "status"],
+        ["Genres", "genres"],
         ["Description", "description"],
         ["Notes", "notes"],
         ["Cover", "cover"]
@@ -687,7 +796,7 @@
       };
       const rows = [
         columns.map(([heading]) => escapeCsv(heading)),
-        ...games.map((game) => columns.map(([, key]) => escapeCsv(game[key])))
+        ...games.map((game) => columns.map(([, key]) => escapeCsv(Array.isArray(game[key]) ? game[key].join(" | ") : game[key])))
       ];
       const csv = `\uFEFF${rows.map((row) => row.join(",")).join("\r\n")}\r\n`;
       const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
@@ -708,6 +817,18 @@
         filter.add(new Option(platform, platform));
       }
       filter.value = platforms.includes(selectedPlatform) ? selectedPlatform : "";
+    }
+
+    function updateGenreFilter() {
+      const filter = document.querySelector("#genreFilter");
+      const selectedGenre = filter.value;
+      const genres = [...new Set(games.flatMap((game) => game.genres || []))]
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+      filter.replaceChildren(new Option("All genres", ""));
+      for (const genre of genres) {
+        filter.add(new Option(genre, genre));
+      }
+      filter.value = genres.includes(selectedGenre) ? selectedGenre : "";
     }
 
     function updateCoverPreview() {
@@ -735,10 +856,12 @@
         select.value = platform;
         custom.value = "";
         custom.hidden = true;
+        custom.required = false;
       } else {
         select.value = "custom";
         custom.value = platform;
         custom.hidden = false;
+        custom.required = true;
       }
     }
 
@@ -746,7 +869,7 @@
       const platformSelect = document.querySelector("#bulkImportPlatform");
       platformSelect.add(new Option("Select a platform", "", true, true));
       platformSelect.options[0].disabled = true;
-      for (const child of document.querySelector("#gamePlatform").children) {
+      for (const child of document.querySelector("#gamePlatform").querySelectorAll(":scope > optgroup")) {
         platformSelect.append(child.cloneNode(true));
       }
       for (const option of platformSelect.options) {
@@ -808,9 +931,10 @@
       gameForm.reset();
       document.querySelector("#dialogTitle").textContent = game ? "Edit game" : "Add a game";
       document.querySelector("#gameTitle").value = game?.title ?? "";
-      updatePlatformSelection(game?.platform ?? "PlayStation 5");
+      updatePlatformSelection(game?.platform ?? "");
       document.querySelector("#gameYear").value = game?.year ?? "";
       document.querySelector("#gameStatus").value = game?.status ?? "Backlog";
+      document.querySelector("#gameGenres").value = (game?.genres ?? []).join(" | ");
       document.querySelector("#gameDescription").value = game?.description ?? "";
       document.querySelector("#gameNotes").value = game?.notes ?? "";
       document.querySelector("#coverSearchInput").value = game?.title ?? "";
@@ -835,6 +959,7 @@
       const response = await api("/api/games");
       games = response.games;
       updatePlatformFilter();
+      updateGenreFilter();
       renderGames();
     }
 
@@ -884,6 +1009,7 @@
             updatePlatformSelection(result.platform || document.querySelector("#gamePlatform").value);
             document.querySelector("#gameYear").value = result.year || "";
             document.querySelector("#gameDescription").value = result.description || "";
+            if (result.genres?.length) document.querySelector("#gameGenres").value = result.genres.join(" | ");
             document.querySelector("#coverSearchInput").value = result.title;
             document.querySelectorAll(".cover-result").forEach((item) => item.classList.remove("selected"));
             button.classList.add("selected");
@@ -940,6 +1066,7 @@
             : document.querySelector("#gamePlatform").value,
           year: document.querySelector("#gameYear").value,
           status: document.querySelector("#gameStatus").value,
+          genres: parseGenres(document.querySelector("#gameGenres").value),
           description: document.querySelector("#gameDescription").value.trim(),
           notes: document.querySelector("#gameNotes").value.trim(),
           cover
@@ -1121,6 +1248,7 @@
     document.querySelector("#gamePlatform").addEventListener("change", (event) => {
       const custom = document.querySelector("#customPlatform");
       custom.hidden = event.target.value !== "custom";
+      custom.required = !custom.hidden;
       if (!custom.hidden) custom.focus();
     });
     document.querySelector("#coverUploadInput").addEventListener("change", async (event) => {
@@ -1235,8 +1363,41 @@
     document.querySelector("#filterInput").addEventListener("input", renderGames);
     document.querySelector("#statusFilter").addEventListener("change", renderGames);
     document.querySelector("#platformFilter").addEventListener("change", renderGames);
+    document.querySelector("#genreFilter").addEventListener("change", renderGames);
     document.querySelector("#sortFilter").addEventListener("change", renderGames);
     document.querySelector("#exportCsvButton").addEventListener("click", exportGamesCsv);
+    document.querySelector("#selectModeButton").addEventListener("click", () => setSelectMode(!selectMode));
+    document.querySelector("#cancelSelectButton").addEventListener("click", () => setSelectMode(false));
+    document.querySelector("#clearSelectionButton").addEventListener("click", () => {
+      const ids = [...selectedIds];
+      selectedIds.clear();
+      ids.forEach(syncCardSelection);
+      updateSelectionUI();
+    });
+    document.querySelector("#selectAllButton").addEventListener("click", () => {
+      for (const game of visibleGames) {
+        selectedIds.add(game.id);
+        syncCardSelection(game.id);
+      }
+      updateSelectionUI();
+    });
+    document.querySelector("#deleteSelectedButton").addEventListener("click", async () => {
+      const ids = [...selectedIds];
+      if (!ids.length) return;
+      if (!confirm(`Remove ${ids.length} ${ids.length === 1 ? "game" : "games"} from your library? This cannot be undone.`)) return;
+      const deleteButton = document.querySelector("#deleteSelectedButton");
+      deleteButton.disabled = true;
+      try {
+        const response = await api("/api/games/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) });
+        selectedIds.clear();
+        selectMode = false;
+        await loadGames();
+        showToast(`Removed ${response.deleted} ${response.deleted === 1 ? "game" : "games"} from your library.`);
+      } catch (error) {
+        showToast(error.message);
+        updateSelectionUI();
+      }
+    });
 
     api("/api/settings/accent-color").then((response) => {
       savedAccentColor = response.color;
